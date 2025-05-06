@@ -7,7 +7,6 @@ requires-python = ">=3.11"
 dependencies = [
     "arviz>=0.21.0",
     "corner>=2.2.3",
-    "csb>=1.2.5",
     "ipykernel>=6.29.5",
     "jax>=0.6.0",
     "jaxlib>=0.6.0",
