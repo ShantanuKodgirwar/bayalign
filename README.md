@@ -20,7 +20,7 @@ uv sync
 ```
 
 > [!NOTE]  
-> If dependencies were changed, make sure to run `uv lock`, followed by exporting it to `requirements.txt` as `uv export --format requirements-txt > requirements.txt` for pip users.
+> If dependencies were changed, make sure to run `uv lock`, followed by exporting these to `requirements.txt` as `uv export --no-emit-project --no-hashes -o requirements.txt` for pip users.
 
 ### Installation with pip (legacy workflow)
 
@@ -33,4 +33,4 @@ pip install -e . --no-deps
 ```
 
 > [!NOTE]  
-> Feel free to choose the type of your environment (venv/conda) when using pip. However uv only supports venv. 
+> Feel free to choose the type of your environment (venv/conda) when using pip. However uv only supports venv.
