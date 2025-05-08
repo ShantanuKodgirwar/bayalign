@@ -3,7 +3,7 @@ name = "bayalign"
 version = "0.1.0"
 description = "Bayesian inference for 3D-2D rigid registration written in JAX."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "arviz>=0.21.0",
     "corner>=2.2.3",
@@ -18,3 +18,6 @@ dependencies = [
     "seaborn>=0.13.2",
     "tsp-solver>=0.1",
 ]
+
+[tool.uv]
+package = true
