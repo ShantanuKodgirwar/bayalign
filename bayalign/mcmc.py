@@ -45,7 +45,7 @@ class Sampler:
         super().__init__(**kwargs)
         self.target = distribution
         self.state = jnp.array(initial_state)
-        self.key = random.PRNGKey(seed) if seed is not None else random.PRNGKey(0)
+        self.key = random.key(seed) if seed is not None else random.key(0)
 
     def __next__(self):
         """
