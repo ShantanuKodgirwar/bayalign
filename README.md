@@ -1,4 +1,4 @@
-# geosss-jax
+# bayalign
 
 Efficient Bayesian inference in JAX via geodesic slice sampling on the sphere (GeoSSS) for point-cloud based 3D-2D rigid registration, demonstrated for the cryo-EM data.
 
