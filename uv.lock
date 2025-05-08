@@ -47,6 +47,41 @@ wheels = [
 ]
 
 [[package]]
+name = "bayalign"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "arviz" },
+    { name = "corner" },
+    { name = "ipykernel" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "joblib" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "ruff" },
+    { name = "scipy" },
+    { name = "seaborn" },
+    { name = "tsp-solver" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "arviz", specifier = ">=0.21.0" },
+    { name = "corner", specifier = ">=2.2.3" },
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "jax", specifier = ">=0.6.0" },
+    { name = "jaxlib", specifier = ">=0.6.0" },
+    { name = "joblib", specifier = ">=1.5.0" },
+    { name = "matplotlib", specifier = ">=3.10.1" },
+    { name = "numpy", specifier = ">=2.2.5" },
+    { name = "ruff", specifier = ">=0.11.8" },
+    { name = "scipy", specifier = ">=1.15.2" },
+    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "tsp-solver", specifier = ">=0.1" },
+]
+
+[[package]]
 name = "cffi"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -257,41 +292,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4c/e4/6934513ec2c4d3d69ca1bc3bd34d5c69dafcbf68c15388dd3bb062daf345/fonttools-4.57.0-cp313-cp313-win32.whl", hash = "sha256:8e2e12d0d862f43d51e5afb8b9751c77e6bec7d2dc00aad80641364e9df5b199", size = 2144833, upload-time = "2025-04-03T11:06:31.737Z" },
     { url = "https://files.pythonhosted.org/packages/c4/0d/2177b7fdd23d017bcfb702fd41e47d4573766b9114da2fddbac20dcc4957/fonttools-4.57.0-cp313-cp313-win_amd64.whl", hash = "sha256:f1d6bc9c23356908db712d282acb3eebd4ae5ec6d8b696aa40342b1d84f8e9e3", size = 2190799, upload-time = "2025-04-03T11:06:34.784Z" },
     { url = "https://files.pythonhosted.org/packages/90/27/45f8957c3132917f91aaa56b700bcfc2396be1253f685bd5c68529b6f610/fonttools-4.57.0-py3-none-any.whl", hash = "sha256:3122c604a675513c68bd24c6a8f9091f1c2376d18e8f5fe5a101746c81b3e98f", size = 1093605, upload-time = "2025-04-03T11:07:11.341Z" },
-]
-
-[[package]]
-name = "geosss-jax"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "arviz" },
-    { name = "corner" },
-    { name = "ipykernel" },
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "joblib" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "ruff" },
-    { name = "scipy" },
-    { name = "seaborn" },
-    { name = "tsp-solver" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "arviz", specifier = ">=0.21.0" },
-    { name = "corner", specifier = ">=2.2.3" },
-    { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "jax", specifier = ">=0.6.0" },
-    { name = "jaxlib", specifier = ">=0.6.0" },
-    { name = "joblib", specifier = ">=1.5.0" },
-    { name = "matplotlib", specifier = ">=3.10.1" },
-    { name = "numpy", specifier = ">=2.2.5" },
-    { name = "ruff", specifier = ">=0.11.8" },
-    { name = "scipy", specifier = ">=1.15.2" },
-    { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "tsp-solver", specifier = ">=0.1" },
 ]
 
 [[package]]
