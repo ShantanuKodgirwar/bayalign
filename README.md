@@ -29,7 +29,7 @@ If you don't want to use uv, and simply rely on pip:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e .
+pip install -e . --no-deps
 ```
 
 > [!NOTE]  
