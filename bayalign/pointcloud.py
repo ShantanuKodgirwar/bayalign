@@ -3,62 +3,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import jax
 import jax.numpy as jnp
+from jaxlie import SO3
 
 
-def _quat_normalise(q: jnp.ndarray) -> jnp.ndarray:
-    """Return q / ‖q‖ with safe NaNs if q≈0 ."""
-    return q / jnp.linalg.norm(q)
+def quat2matrix(q):
+    return SO3.from_quaternion_xyzw(q).as_matrix()
 
 
-def quat2matrix(q: jnp.ndarray) -> jnp.ndarray:
-    """
-    Quaternion (x,y,z,w) → 3×3 rotation matrix.
-    Same formula as SciPy, now with jax.numpy so it is jit- and grad-able.
-    """
-    q = _quat_normalise(q)
-    x, y, z, w = q
-
-    return jnp.array(
-        [
-            [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
-            [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
-            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
-        ]
-    )
-
-
-def matrix2quat(R: jnp.ndarray) -> jnp.ndarray:
-    """3×3 rotation matrix → quaternion (x,y,z,w)."""
-    # closed-form adapted for JAX (no SciPy).  Works for proper rotations.
-    m00, m01, m02 = R[0]
-    m10, m11, m12 = R[1]
-    m20, m21, m22 = R[2]
-
-    trace = m00 + m11 + m22
-
-    def _branch1():
-        s = jnp.sqrt(trace + 1.0) * 2.0
-        return jnp.array([(m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s, 0.25 * s])
-
-    def _branch2():
-        def _i_max0():
-            s = jnp.sqrt(1.0 + m00 - m11 - m22) * 2.0
-            return jnp.array(
-                [0.25 * s, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s]
-            )
-
-        def _i_max1():
-            s = jnp.sqrt(1.0 + m11 - m00 - m22) * 2.0
-            return jnp.array(
-                [(m01 + m10) / s, 0.25 * s, (m12 + m21) / s, (m02 - m20) / s]
-            )
-
-        s = jnp.sqrt(1.0 + m22 - m00 - m11) * 2.0
-        return jnp.array([(m02 + m20) / s, (m12 + m21) / s, 0.25 * s, (m10 - m01) / s])
-
-    return jax.lax.cond(trace > 0.0, _branch1, _branch2)
+def matrix2quat(R):
+    return SO3.from_matrix(R).quat_xyzw()
 
 
 @dataclass(frozen=True)
