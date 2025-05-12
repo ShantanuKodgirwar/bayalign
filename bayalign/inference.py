@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 from jax import random
 
-from bayalign import sphere
+from bayalign.sphere_utils import radial_projection, spherical_projection
 
 
 def determine_burnin(n_samples, burnin):
@@ -142,7 +142,7 @@ class MetropolisHastings(Sampler, AdaptiveStepsize):
         d = len(x)
         r = jnp.sqrt(2 * random.gamma(subkey1, d / 2))
         y = r * x + self.stepsize * random.normal(subkey2, shape=(d,))
-        return sphere.radial_projection(y)
+        return radial_projection(y)
 
     def accept_reject(self, state):
         """
@@ -180,7 +180,7 @@ class IndependenceSampler(MetropolisHastings):
     def propose(self):
         self.key, subkey = random.split(self.key)
         x = random.normal(subkey, shape=(len(self.state),))
-        return sphere.radial_projection(x)
+        return radial_projection(x)
 
 
 def project(x, v):
@@ -275,7 +275,7 @@ class SphericalHMC(MetropolisHastings):
             0, self.n_steps, lambda i, inputs: leapfrog_step(i, inputs), (x, v)
         )
 
-        return jnp.hstack([sphere.radial_projection(x), v])
+        return jnp.hstack([radial_projection(x), v])
 
     def accept_reject(self, state):
         self.key, subkey = random.split(self.key)
@@ -321,7 +321,7 @@ class RejectionSphericalSliceSampler(Sampler):
         self.key, subkey1, subkey2 = random.split(self.key, 3)
 
         # Sample subsphere
-        u = sphere.spherical_projection(random.normal(subkey1, shape=(len(x),)), x)
+        u = spherical_projection(random.normal(subkey1, shape=(len(x),)), x)
 
         # Compute threshold
         threshold = p(x) + jnp.log(random.uniform(subkey2))
@@ -355,7 +355,7 @@ class ShrinkageSphericalSliceSampler(RejectionSphericalSliceSampler):
         self.key, subkey1, subkey2, subkey3 = random.split(self.key, 4)
 
         # Sample subsphere
-        u = sphere.spherical_projection(random.normal(subkey1, shape=(len(x),)), x)
+        u = spherical_projection(random.normal(subkey1, shape=(len(x),)), x)
 
         # Compute threshold
         threshold = p(x) + jnp.log(random.uniform(subkey2))
