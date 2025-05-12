@@ -64,7 +64,6 @@ dependencies = [
     { name = "ruff" },
     { name = "scipy" },
     { name = "seaborn" },
-    { name = "tsp-solver" },
 ]
 
 [package.metadata]
@@ -81,7 +80,6 @@ requires-dist = [
     { name = "ruff", specifier = ">=0.11.8" },
     { name = "scipy", specifier = ">=1.15.2" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "tsp-solver", specifier = ">=0.1" },
 ]
 
 [[package]]
@@ -1419,12 +1417,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/eb/79/72064e6a701c21830
 wheels = [
     { url = "https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl", hash = "sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f", size = 85359, upload-time = "2024-04-19T11:11:46.763Z" },
 ]
-
-[[package]]
-name = "tsp-solver"
-version = "0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/83/8d/05182bd13ff9bfeb040bd877cad71a2cb37e51f29384ed0bbc49f1ad5ca5/tsp_solver-0.1.tar.gz", hash = "sha256:e6e48d8929a2bc3ce21420b5662a4cd361b16a65caaf9218b5a7fc161c6b37a5", size = 2539, upload-time = "2016-11-18T14:37:42.713Z" }
 
 [[package]]
 name = "typeguard"
