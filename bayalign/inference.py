@@ -1,5 +1,5 @@
 """
-Implementation of the below MCMC algorithms:
+Implementation of the below MCMC algorithms for inference on the sphere:
 - Random walk Metropolis-Hastings algorithm on the sphere
 - Spherical Hamiltonian Monte Carlo
 - Slice sampling on the sphere using a rejection and a shrinkage sampler
@@ -7,7 +7,6 @@ Implementation of the below MCMC algorithms:
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from jax import random
 
 from bayalign import sphere
