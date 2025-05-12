@@ -1,7 +1,7 @@
 # bayalign
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 
-Efficient Bayesian inference in JAX via geodesic slice sampling on the sphere (GeoSSS) for point-cloud based 3D-2D rigid registration, demonstrated for the cryo-EM data.
+Efficient Bayesian inference via geodesic slice sampling on the sphere (GeoSSS) for point-cloud based 3D-2D rigid registration, demonstrated for the cryo-EM data. The library is written in JAX and therefore, it is GPU-accelerated and autodifferentiable.
 
 ## Development
 
