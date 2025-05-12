@@ -2,7 +2,6 @@
 Some utility functions for sampling from the sphere using JAX.
 """
 
-import jax
 import jax.numpy as jnp
 from jax import random
 
@@ -82,8 +81,8 @@ def polar2cartesian(theta):
 def spherical2cartesian(phi, theta):
     return jnp.transpose(
         jnp.stack([
-            jnp.cos(phi) * jnp.sin(theta), 
-            jnp.sin(phi) * jnp.sin(theta), 
+            jnp.cos(phi) * jnp.sin(theta),
+            jnp.sin(phi) * jnp.sin(theta),
             jnp.cos(theta)
         ])
     )
@@ -98,8 +97,8 @@ def sample_marginal(key, d, size=None):
     s = random.beta(key, 0.5, 0.5 * (d - 1), shape=() if size is None else (size,))
     sign_key = random.split(key)[1]
     t = jnp.sqrt(s) * jnp.where(
-        random.uniform(sign_key, shape=() if size is None else (size,)) < 0.5, 
-        -1.0, 
+        random.uniform(sign_key, shape=() if size is None else (size,)) < 0.5,
+        -1.0,
         1.0
     )
     return t
