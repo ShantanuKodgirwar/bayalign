@@ -1,5 +1,4 @@
 # pointcloud_jax.py
-from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -41,7 +40,6 @@ class PointCloud:
         if self.weights.shape != (self.positions.shape[0],):
             raise ValueError("weights must be 1-D array of length N")
 
-    # ------------- convenient properties ---------------------------------
     @property
     def dim(self) -> int:
         return int(self.positions.shape[1])
@@ -56,7 +54,6 @@ class PointCloud:
             self.weights
         )
 
-    # ------------- geometry ----------------------------------------------
     def transform_positions(
         self, rotation: jnp.ndarray, translation: jnp.ndarray | None = None
     ) -> jnp.ndarray:

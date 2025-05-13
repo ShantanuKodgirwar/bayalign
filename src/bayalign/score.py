@@ -22,7 +22,7 @@ import jax
 import jax.numpy as jnp
 from jax import grad, jit
 from jax.scipy.special import logsumexp
-from pointcloud import PointCloud, quat2matrix
+from .pointcloud import PointCloud, quat2matrix
 
 
 # ---------------------------------------------------------------------- #
