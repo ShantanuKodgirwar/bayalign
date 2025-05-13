@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "bayalign"
 version = "0.1.0"
@@ -5,19 +9,29 @@ description = "Bayesian inference for 3D-2D rigid registration written in JAX."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "arviz>=0.21.0",
-    "corner>=2.2.3",
-    "ipykernel>=6.29.5",
     "jax>=0.6.0",
     "jaxlib>=0.6.0",
     "jaxlie>=1.5.0",
     "joblib>=1.5.0",
-    "matplotlib>=3.10.1",
     "numpy>=2.2.5",
-    "ruff>=0.11.8",
-    "scipy>=1.15.2",
+]
+
+[project.optional-dependencies]
+viz = [
+    "arviz>=0.21.0",
+    "corner>=2.2.3",
+    "matplotlib>=3.10.1",
+    "pandas>=2.2.3",
+    "plotly>=6.0.1",
     "seaborn>=0.13.2",
 ]
+dev = [
+    "ruff>=0.11.8",
+    "ipykernel>=6.29.5", 
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
 
 [tool.uv]
 package = true

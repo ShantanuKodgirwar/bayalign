@@ -52,35 +52,44 @@ name = "bayalign"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "arviz" },
-    { name = "corner" },
-    { name = "ipykernel" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxlie" },
     { name = "joblib" },
-    { name = "matplotlib" },
     { name = "numpy" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "ipykernel" },
     { name = "ruff" },
-    { name = "scipy" },
+]
+viz = [
+    { name = "arviz" },
+    { name = "corner" },
+    { name = "matplotlib" },
+    { name = "pandas" },
+    { name = "plotly" },
     { name = "seaborn" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "arviz", specifier = ">=0.21.0" },
-    { name = "corner", specifier = ">=2.2.3" },
-    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "arviz", marker = "extra == 'viz'", specifier = ">=0.21.0" },
+    { name = "corner", marker = "extra == 'viz'", specifier = ">=2.2.3" },
+    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5" },
     { name = "jax", specifier = ">=0.6.0" },
     { name = "jaxlib", specifier = ">=0.6.0" },
     { name = "jaxlie", specifier = ">=1.5.0" },
     { name = "joblib", specifier = ">=1.5.0" },
-    { name = "matplotlib", specifier = ">=3.10.1" },
+    { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.10.1" },
     { name = "numpy", specifier = ">=2.2.5" },
-    { name = "ruff", specifier = ">=0.11.8" },
-    { name = "scipy", specifier = ">=1.15.2" },
-    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "pandas", marker = "extra == 'viz'", specifier = ">=2.2.3" },
+    { name = "plotly", marker = "extra == 'viz'", specifier = ">=6.0.1" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.8" },
+    { name = "seaborn", marker = "extra == 'viz'", specifier = ">=0.13.2" },
 ]
+provides-extras = ["viz", "dev"]
 
 [[package]]
 name = "cffi"
@@ -813,6 +822,15 @@ wheels = [
 ]
 
 [[package]]
+name = "narwhals"
+version = "1.39.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/eb/50bd207820ac84b86dee216e2caf3fdf456e59bc854543f8d0ab8637cd66/narwhals-1.39.0.tar.gz", hash = "sha256:6f114def701fc6a23b0523ad53700ae545ad3f5ece041c64dc3ad59e699da43f", size = 471928, upload-time = "2025-05-12T10:01:51.352Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/22/58/a12a534269aa5ba9abdf73a9e0deb600297b71cbf7291bca212944663143/narwhals-1.39.0-py3-none-any.whl", hash = "sha256:50b6778f4b4249eb86c88dd17c3907dd004a16ec25b02d5effaf226a2bcfb940", size = 339242, upload-time = "2025-05-12T10:01:49.069Z" },
+]
+
+[[package]]
 name = "nest-asyncio"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1054,6 +1072,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b6/2d/7d512a3913d60623e7eb945c6d1b4f0bddf1d0b7ada5225274c87e5b53d1/platformdirs-4.3.7.tar.gz", hash = "sha256:eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351", size = 21291, upload-time = "2025-03-19T20:36:10.989Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/45/59578566b3275b8fd9157885918fcd0c4d74162928a5310926887b856a51/platformdirs-4.3.7-py3-none-any.whl", hash = "sha256:a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94", size = 18499, upload-time = "2025-03-19T20:36:09.038Z" },
+]
+
+[[package]]
+name = "plotly"
+version = "6.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c7/cc/e41b5f697ae403f0b50e47b7af2e36642a193085f553bf7cc1169362873a/plotly-6.0.1.tar.gz", hash = "sha256:dd8400229872b6e3c964b099be699f8d00c489a974f2cfccfad5e8240873366b", size = 8094643, upload-time = "2025-03-17T15:02:23.994Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/65/ad2bc85f7377f5cfba5d4466d5474423a3fb7f6a97fd807c06f92dd3e721/plotly-6.0.1-py3-none-any.whl", hash = "sha256:4714db20fea57a435692c548a4eb4fae454f7daddf15f8d8ba7e1045681d7768", size = 14805757, upload-time = "2025-03-17T15:02:18.73Z" },
 ]
 
 [[package]]
