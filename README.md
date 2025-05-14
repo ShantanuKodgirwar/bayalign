@@ -33,12 +33,18 @@ The package is maintained with the fast package manager [uv](https://github.com/
 uv sync
 ```
 
-This provides a default JAX CPU support. For a full list of options,
+This installs the package along with the JAX-based CPU dependencies. To activate this environment, 
+
+```bash
+source .venv/bin/activate
+```
+
+For a full list of installation options,
 
 | Command                   | Description                                       |
 | ------------------------- | ------------------------------------------------- |
 | `uv sync --extra gpu`     | Installs the package with JAX GPU/CUDA 12 support |
-| `uv sync --extra viz`     | Installs with visualization dependencies          |
+| `uv sync --extra viz`     | Installs with visualization dependencies (running files from the [examples](examples/) directory)          |
 | `uv sync --extra dev`     | Installs with development tools                   |
 | `uv sync --extra all`     | Installs with all dependencies (CPU version)      |
 | `uv sync --extra all-gpu` | Installs with all dependencies (GPU version)      |
