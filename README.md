@@ -12,26 +12,46 @@ git clone https://github.com/ShantanuKodgirwar/bayalign.git
 cd bayalign
 ```
 
+### Installation with pip (legacy workflow)
+
+If you don't want to use uv (if you do, see below!), and simply rely on pip:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-cpu.txt # or via `requirements-gpu.txt`
+pip install -e . --no-deps
+```
+
+> [!NOTE]  
+> Feel free to choose the type of your environment (venv/conda) when using pip.
+
 ### Installation with uv (recommended!)
 
-The package is maintained with the fast package manager [uv](https://github.com/astral-sh/uv). The package `bayalign` and its *locked* dependencies can be installed in a dedicated virtual environment with the single command:
+The package is maintained with the fast package manager [uv](https://github.com/astral-sh/uv). The package `bayalign` and its *locked* dependencies can be installed in a dedicated virtual environment (only supports venv) with the single command:
 
 ```bash
 uv sync
 ```
 
-> [!NOTE]  
-> If dependencies were changed, make sure to run `uv lock`, followed by exporting these to `requirements.txt` as `uv export --no-emit-project --no-hashes -o requirements.txt` for pip users.
+This provides a default JAX CPU support. For a full list of options,
 
-### Installation with pip (legacy workflow)
+| Command                   | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `uv sync --extra gpu`     | Installs the package with JAX GPU/CUDA 12 support |
+| `uv sync --extra viz`     | Installs with visualization dependencies          |
+| `uv sync --extra dev`     | Installs with development tools                   |
+| `uv sync --extra all`     | Installs with all dependencies (CPU version)      |
+| `uv sync --extra all-gpu` | Installs with all dependencies (GPU version)      |
 
-If you don't want to use uv, and simply rely on pip:
+
+Additionally for pip users, please export any dependency changes to a requirements file as:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e . --no-deps
+uv export --extra all --no-emit-project --no-hashes -o requirements-cpu.txt
 ```
 
-> [!NOTE]  
-> Feel free to choose the type of your environment (venv/conda) when using pip. However uv only supports venv.
+For GPU dependency changes, 
+
+```bash
+uv export --extra all-gpu --no-emit-project --no-hashes -o requirements-cpu.txt
+```
