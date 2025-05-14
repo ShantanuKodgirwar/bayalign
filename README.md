@@ -53,5 +53,5 @@ uv export --extra all --no-emit-project --no-hashes -o requirements-cpu.txt
 For GPU dependency changes, 
 
 ```bash
-uv export --extra all-gpu --no-emit-project --no-hashes -o requirements-cpu.txt
+uv export --extra all-gpu --no-emit-project --no-hashes -o requirements-gpu.txt
 ```
