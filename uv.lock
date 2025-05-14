@@ -57,6 +57,7 @@ dependencies = [
     { name = "jaxlie" },
     { name = "joblib" },
     { name = "numpy" },
+    { name = "scipy" },
 ]
 
 [package.optional-dependencies]
@@ -68,7 +69,6 @@ all = [
     { name = "pandas" },
     { name = "plotly" },
     { name = "ruff" },
-    { name = "scipy" },
     { name = "seaborn" },
 ]
 all-gpu = [
@@ -80,7 +80,6 @@ all-gpu = [
     { name = "pandas" },
     { name = "plotly" },
     { name = "ruff" },
-    { name = "scipy" },
     { name = "seaborn" },
 ]
 dev = [
@@ -96,7 +95,6 @@ viz = [
     { name = "matplotlib" },
     { name = "pandas" },
     { name = "plotly" },
-    { name = "scipy" },
     { name = "seaborn" },
 ]
 
@@ -117,7 +115,7 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'viz'", specifier = ">=2.2.3" },
     { name = "plotly", marker = "extra == 'viz'", specifier = ">=6.0.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.8" },
-    { name = "scipy", marker = "extra == 'viz'", specifier = ">=1.15.2" },
+    { name = "scipy", specifier = ">=1.15.2" },
     { name = "seaborn", marker = "extra == 'viz'", specifier = ">=0.13.2" },
 ]
 provides-extras = ["gpu", "viz", "dev", "all", "all-gpu"]
