@@ -230,8 +230,8 @@ class MixtureSphericalGaussians(Registration):
     target: PointCloud
     source: PointCloud  # Can be PointCloud or RotationProjection
     sigma: float = 1.0
-    k: int = 20
     beta: float = 1.0
+    k: int = 20
     use_kdtree: bool = True
     pc_threshold: int = 5000  # Threshold for warning about large point clouds
     """
