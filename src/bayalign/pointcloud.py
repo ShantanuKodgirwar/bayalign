@@ -1,43 +1,8 @@
-# pointcloud_jax.py
-
 from dataclasses import dataclass
 
 import jax.numpy as jnp
-from jax.scipy.spatial.transform import Rotation
 
-
-def quat2matrix(q):
-    """
-    Convert a quaternion to a 3x3 rotation matrix.
-
-    Parameters
-    ----------
-    q : array_like
-        A 4-element quaternion (x, y, z, w). Scalar last convention.
-
-    Returns
-    -------
-    R : array_like
-        A 3x3 rotation matrix
-    """
-    return Rotation.from_quat(q).as_matrix()
-
-
-def matrix2quat_(R):
-    """
-    Convert a 3x3 rotation matrix to a quaternion. Scalar last convention.
-
-    Parameters
-    ----------
-    R : array_like
-        A 3x3 rotation matrix.
-
-    Returns
-    -------
-    array_like
-        A 4-element quaternion (x, y, z, w).
-    """
-    return Rotation.from_matrix(R).as_quat()
+from .utils import quat2matrix
 
 
 @dataclass(frozen=True)
