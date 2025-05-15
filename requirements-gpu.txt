@@ -9,9 +9,7 @@ asttokens==3.0.0
 cffi==1.17.1 ; implementation_name == 'pypy'
     # via pyzmq
 colorama==0.4.6 ; sys_platform == 'win32'
-    # via
-    #   ipython
-    #   tyro
+    # via ipython
 comm==0.2.2
     # via ipykernel
 contourpy==1.3.2
@@ -24,8 +22,6 @@ debugpy==1.8.14
     # via ipykernel
 decorator==5.2.1
     # via ipython
-docstring-parser==0.16
-    # via tyro
 exceptiongroup==1.2.2 ; python_full_version < '3.11'
     # via ipython
 executing==2.2.0
@@ -45,23 +41,13 @@ ipython==9.2.0 ; python_full_version >= '3.11'
 ipython-pygments-lexers==1.1.1 ; python_full_version >= '3.11'
     # via ipython
 jax==0.6.0
-    # via
-    #   bayalign
-    #   jax-dataclasses
-    #   jaxlie
+    # via bayalign
 jax-cuda12-pjrt==0.6.0
     # via jax-cuda12-plugin
 jax-cuda12-plugin==0.6.0
     # via jax
-jax-dataclasses==1.6.2
-    # via jaxlie
 jaxlib==0.6.0
-    # via
-    #   bayalign
-    #   jax
-    #   jax-dataclasses
-jaxlie==1.5.0
-    # via bayalign
+    # via jax
 jedi==0.19.2
     # via ipython
 joblib==1.5.0
@@ -74,8 +60,6 @@ jupyter-core==5.7.2
     #   jupyter-client
 kiwisolver==1.4.8
     # via matplotlib
-markdown-it-py==3.0.0
-    # via rich
 matplotlib==3.10.1
     # via
     #   arviz
@@ -86,8 +70,6 @@ matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
-mdurl==0.1.2
-    # via markdown-it-py
 ml-dtypes==0.5.1
     # via
     #   jax
@@ -104,7 +86,6 @@ numpy==2.2.5
     #   h5py
     #   jax
     #   jaxlib
-    #   jaxlie
     #   matplotlib
     #   ml-dtypes
     #   pandas
@@ -181,7 +162,6 @@ pygments==2.19.1
     # via
     #   ipython
     #   ipython-pygments-lexers
-    #   rich
 pyparsing==3.2.3
     # via matplotlib
 python-dateutil==2.9.0.post0
@@ -197,8 +177,6 @@ pyzmq==26.4.0
     # via
     #   ipykernel
     #   jupyter-client
-rich==14.0.0
-    # via tyro
 ruff==0.11.8
     # via bayalign
 scipy==1.15.2
@@ -212,8 +190,6 @@ seaborn==0.13.2
     # via bayalign
 setuptools==80.3.1
     # via arviz
-shtab==1.7.2
-    # via tyro
 six==1.17.0
     # via python-dateutil
 stack-data==0.6.3
@@ -230,19 +206,10 @@ traitlets==5.14.3
     #   jupyter-client
     #   jupyter-core
     #   matplotlib-inline
-typeguard==4.4.2
-    # via tyro
 typing-extensions==4.13.2
     # via
     #   arviz
     #   ipython
-    #   jax-dataclasses
-    #   jaxlie
-    #   rich
-    #   typeguard
-    #   tyro
-tyro==0.9.20
-    # via jaxlie
 tzdata==2025.2
     # via pandas
 wcwidth==0.2.13
