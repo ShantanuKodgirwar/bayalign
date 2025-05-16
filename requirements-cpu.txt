@@ -32,6 +32,8 @@ h5netcdf==1.6.1
     # via arviz
 h5py==3.13.0
     # via h5netcdf
+imageio==2.37.0
+    # via scikit-image
 ipykernel==6.29.5
     # via bayalign
 ipython==8.36.0 ; python_full_version < '3.11'
@@ -56,6 +58,8 @@ jupyter-core==5.7.2
     #   jupyter-client
 kiwisolver==1.4.8
     # via matplotlib
+lazy-loader==0.4
+    # via scikit-image
 matplotlib==3.10.1
     # via
     #   arviz
@@ -76,20 +80,25 @@ narwhals==1.39.0
     # via plotly
 nest-asyncio==1.6.0
     # via ipykernel
+networkx==3.4.2
+    # via scikit-image
 numpy==2.2.5
     # via
     #   arviz
     #   bayalign
     #   contourpy
     #   h5py
+    #   imageio
     #   jax
     #   jaxlib
     #   matplotlib
     #   ml-dtypes
     #   mrcfile
     #   pandas
+    #   scikit-image
     #   scipy
     #   seaborn
+    #   tifffile
     #   xarray
     #   xarray-einstats
 opt-einsum==3.4.0
@@ -99,8 +108,10 @@ packaging==25.0
     #   arviz
     #   h5netcdf
     #   ipykernel
+    #   lazy-loader
     #   matplotlib
     #   plotly
+    #   scikit-image
     #   xarray
 pandas==2.2.3
     # via
@@ -113,7 +124,10 @@ parso==0.8.4
 pexpect==4.9.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
     # via ipython
 pillow==11.2.1
-    # via matplotlib
+    # via
+    #   imageio
+    #   matplotlib
+    #   scikit-image
 platformdirs==4.3.7
     # via jupyter-core
 plotly==6.0.1
@@ -149,12 +163,15 @@ pyzmq==26.4.0
     #   jupyter-client
 ruff==0.11.8
     # via bayalign
+scikit-image==0.25.2
+    # via bayalign
 scipy==1.15.2
     # via
     #   arviz
     #   bayalign
     #   jax
     #   jaxlib
+    #   scikit-image
     #   xarray-einstats
 seaborn==0.13.2
     # via bayalign
@@ -164,6 +181,8 @@ six==1.17.0
     # via python-dateutil
 stack-data==0.6.3
     # via ipython
+tifffile==2025.5.10
+    # via scikit-image
 tornado==6.4.2
     # via
     #   ipykernel

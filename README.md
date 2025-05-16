@@ -41,13 +41,13 @@ source .venv/bin/activate
 
 For a full list of installation options,
 
-| Command                   | Description                                                                               |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `uv sync --extra gpu`     | Installs the package with JAX GPU/CUDA 12 support                                         |
-| `uv sync --extra viz`     | Installs with visualization dependencies (files from the [examples](examples/) directory) |
-| `uv sync --extra dev`     | Installs with development tools                                                           |
-| `uv sync --extra all`     | Installs with all dependencies (CPU version)                                              |
-| `uv sync --extra all-gpu` | Installs with all dependencies (GPU version)                                              |
+| Command                    | Description                                            |
+| -------------------------- | ------------------------------------------------------ |
+| `uv sync --extra gpu`      | Installs the package with JAX GPU/CUDA 12 support      |
+| `uv sync --extra examples` | Installs dependencies to run the [examples](examples/) |
+| `uv sync --extra dev`      | Installs with development tools                        |
+| `uv sync --extra all`      | Installs with all dependencies (CPU version)           |
+| `uv sync --extra all-gpu`  | Installs with all dependencies (GPU version)           |
 
 
 Additionally for pip users, please export any dependency changes to a requirements file with a simple execution of the helper shell script as 

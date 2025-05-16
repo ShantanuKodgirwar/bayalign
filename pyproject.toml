@@ -19,13 +19,14 @@ dependencies = [
 gpu = [
     "jax[cuda12]>=0.6.0",  # This will override the CPU version with the GPU version
 ]
-viz = [
+examples = [
     "arviz>=0.21.0",
     "corner>=2.2.3",
     "matplotlib>=3.10.1",
     "mrcfile>=1.5.4",
     "pandas>=2.2.3",
     "plotly>=6.0.1",
+    "scikit-image>=0.25.2",
     "seaborn>=0.13.2",
 ]
 dev = [
@@ -33,10 +34,10 @@ dev = [
     "ipykernel>=6.29.5", 
 ]
 all = [
-    "bayalign[viz,dev]",
+    "bayalign[examples,dev]",
 ]
 all-gpu = [
-    "bayalign[gpu,viz,dev]",
+    "bayalign[gpu,examples,dev]",
 ]
 
 [tool.setuptools]
