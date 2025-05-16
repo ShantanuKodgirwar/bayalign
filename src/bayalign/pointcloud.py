@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from .utils import quat2matrix
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class PointCloud:
     """
     Immutable, JIT-friendly weighted point cloud in 2-D or 3-D.
@@ -65,7 +65,7 @@ class PointCloud:
         return PointCloud(self.transform_positions(rotation, translation), self.weights)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class RotationProjection(PointCloud):
     """
     Rotate a 3-D cloud and project onto XY, giving a 2-D cloud.

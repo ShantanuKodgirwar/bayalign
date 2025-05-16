@@ -191,7 +191,7 @@ def test_gradient_flow():
             issues.append(
                 "MixtureSphericalGaussians gradients don't match numerical approximation"
             )
-        print(f"\n✗ GRADIENT VALIDATION FAILED: {', '.join(issues)}")
+        print(f"\n\u274c GRADIENT VALIDATION FAILED: {', '.join(issues)}")
 
 
 if __name__ == "__main__":
