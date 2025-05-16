@@ -18,7 +18,7 @@ is set everywhere. If needed, we could add support for translations in the futur
 
 # TODO: Note that this implementation still has implementation issues, such as `kd_tree_nn`
 # via `jax.pure_callback` causes issues with grad flow. I assumed `jax.lax.stop_gradient`.
-# test implementation via `examples/test_grad.py` and `examples/benchamark_scores_3d3d.py`
+# test implementation via `examples/test_grad_cryoem_data.py` and `examples/test_grad_synthetic_data.py`
 import warnings
 from dataclasses import dataclass
 from functools import partial
@@ -272,20 +272,21 @@ class MixtureSphericalGaussians(Registration):
             else:
                 idx = find_nearest_k_indices(tgt_pos, src_pos_transformed, k, threshold)
 
-            # Stop gradient through the indices (ignores this
-            # in the computational graph)
+            # Stop gradient through the indices
             idx = jax.lax.stop_gradient(idx)
 
             # Differentiable part: Recompute distances for gradient flow
             src_selected = jnp.take(src_pos_transformed, idx, axis=0)
             d2 = jnp.sum((tgt_pos[:, None, :] - src_selected) ** 2, axis=-1)
 
-            # Compute probability
-            phi = jnp.exp(-0.5 * d2 / sig**2)
-            w_k = src_w[idx]
-            ll = logsumexp(
-                jnp.log(w_k) + jnp.log(phi) - jnp.log(2 * jnp.pi * sig**2), axis=1
-            )
+            # Compute log probability directly without intermediate exp() calculation
+            # This avoids potential underflow/overflow in the exponential
+            log_phi = -0.5 * d2 / sig**2
+            log_w_k = jnp.log(jnp.take(src_w, idx))
+            log_norm = jnp.log(2 * jnp.pi * sig**2)
+
+            # Use logsumexp for numerical stability
+            ll = logsumexp(log_w_k + log_phi - log_norm, axis=1)
 
             return jnp.sum(ll * tgt_w)
 
