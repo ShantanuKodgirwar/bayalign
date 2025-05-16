@@ -1,177 +1,198 @@
-import mrcfile
-import numpy as np
-import scipy.ndimage as ndi
-from scipy.optimize import approx_fprime
-from scipy.spatial import KDTree
-from scipy.special import logsumexp
-from skimage import measure
+"""
+Test script to validate AD based gradient computation with
+finite differences (scipy.optimize.approx_fprime).
+"""
 
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax import random
+from scipy.optimize import approx_fprime
+
+# Import your implementation
 from bayalign.pointcloud import PointCloud, RotationProjection
 from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
-from bayalign.sphere_utils import sample_sphere
+from bayalign.utils import quat2matrix
+
+# Set random seed for reproducibility
+np.random.seed(42)
+key = random.PRNGKey(42)
+jax.config.update("jax_enable_x64", True)  # Use double precision for stability
 
 
-def load_class_average(index=0):
-    """Loads a projection image (class average) of the 80S ribosome.
+def random_rotation(key):
+    """Generate a random rotation as a quaternion (x, y, z, w)."""
+    key, subkey = random.split(key)
+    quat = random.normal(subkey, shape=(4,))
+    quat = quat / jnp.linalg.norm(quat)
+    return quat
 
-    Parameters
-    ----------
-    index : int, optional
-        index for one of the images in the file., by default 0
 
-    Returns
-    -------
-    np.ndarray
-        single image
+def create_test_point_clouds(key, n_points=100, dim=3, noise_level=0.1):
+    """Create test point clouds for registration testing."""
+    key, subkey1, subkey2 = random.split(key, 3)
+    positions = random.normal(subkey1, shape=(n_points, dim))
+    weights = jnp.ones(n_points) / n_points
+
+    source_pc = PointCloud(positions, weights)
+
+    true_rotation = random_rotation(subkey2)
+    rotation_matrix = quat2matrix(true_rotation)
+
+    rotated_positions = positions @ rotation_matrix.T
+    key, noise_key = random.split(key)
+    noise = noise_level * random.normal(noise_key, shape=(n_points, dim))
+    noisy_positions = rotated_positions + noise
+
+    target_pc = PointCloud(noisy_positions, weights)
+
+    return source_pc, target_pc, true_rotation
+
+
+def compute_numerical_gradient(scorer, rotation, epsilon=1e-6):
     """
+    Compute numerical gradient of log_prob with respect to rotation quaternion
+    using finite differences.
 
-    assert 0 <= index < 400
-    data = mrcfile.open("data/ribosome_80S/pfrib80S_cavgs.mrc").data
-    return data[index]
+    Parameters:
+        scorer: Object with log_prob method
+        rotation: Quaternion array of shape (4,)
+        epsilon: Step size for finite differences
 
-
-def pointcloud_from_class_avg(image, pixelsize=2.68):
-    """Creates a pointcloud from class average projection image
-
-    Parameters
-    ----------
-    image : np.ndarray
-        class average projection image
-    return_image : bool, optional
-        Flag indicating if image should also be returned, by default True
-    pixelsize : float, optional
-        Pixel size in Angstrom, by default 2.68
-
-    Returns
-    -------
-    target: np.ndarry
-        target image
+    Returns:
+        Numerical gradient array of shape (4,)
     """
+    # Convert to numpy for scipy's approx_fprime
+    rotation_np = np.array(rotation)
 
-    # determine a threshold that will be used to convert the grayscale image to
-    # a point cloud
-    threshold = (np.median(image), np.mean(image))[1]
-    mask = image > threshold
+    # Define function that takes numpy array and returns scalar
+    def f(x):
+        return float(scorer.log_prob(jnp.array(x)))
 
-    # find connected regions
-    labels = ndi.label(mask)[0]
+    # Compute numerical gradient
+    num_grad = approx_fprime(rotation_np, f, epsilon)
 
-    # keep the largest connected region
-    props = measure.regionprops(labels, intensity_image=image)
-    centers = np.array([prop.weighted_centroid for prop in props])  # noqa: F841
-    index = np.argmax([prop.area for prop in props])
-    mask = labels == props[index].label
-
-    # create a point cloud representing the projected ribosome (shifted pixel
-    # values will serve as weights)
-
-    # 2D locations of selected pixels in Angstrom
-    positions = np.transpose(np.nonzero(mask)) * pixelsize
-
-    # pixel values of selected pixels shifted by threshold so as to make
-    # these positive (such that they can be interpreted as weights/mass)
-    weights = image[mask] - threshold
-
-    # create point cloud
-    target = PointCloud(positions, weights)
-
-    # shift point cloud's center such that the center of mass is at (0, 0)
-    # we do this in order to remove an additional in-plane translation
-    target.transform(np.eye(2), -target.center_of_mass)
-
-    return target
+    return jnp.array(num_grad)
 
 
-def fit_model2d(target, K, n_iter=1000, k=100):
-    """
-    Fits a 2D model (mixture of gaussians) with fixed number of points (RBF kernels) K to weighted 2D point cloud using
-    Expectation-Maximization (EM) algorithm. This returns a fixed bandwidth `sigma`.
+def test_gradient_flow():
+    """Test if gradients flow correctly through the scoring functions."""
+    print("Testing gradient flow...")
 
-    :param target: Pointcloud
-        Point cloud that will be fitted with a smaller (unweighted) point cloud
-        by using Expectation Maximization.
-    :param K: positive int
-        Desired number of points or clusters
-    :param n_iter: positive int
-        Number of iterations in expectation maximization
-    :param k: positive int
-        Number of nearest neighbours that will be considered in the assignment
-        of points in the target to points in the approximate (unweighted) point
-        cloud.
-    :return: x: array_like
-        Returns the fitted positions
-    :return: sigma: scalar
-        Standard deviation of the associated fit.
-    """
+    global key
 
-    # Normalize weights
-    w = target.weights / target.weights.sum()
-    y = target.positions
+    # Create 3D test data
+    key, subkey1 = random.split(key)
+    source_3d, target_3d, true_rotation = create_test_point_clouds(
+        subkey1, n_points=100, dim=3
+    )
 
-    sigma = None
+    # Create 2D test data (for 3D-2D projection test)
+    key, subkey2, subkey3 = random.split(key, 3)
+    source_3d_for_proj, _, _ = create_test_point_clouds(subkey2, n_points=100, dim=3)
+    projection_source = RotationProjection(
+        source_3d_for_proj.positions, source_3d_for_proj.weights
+    )
 
-    # Initialize centers by sampling from the target positions based on weights
-    x = y[np.random.choice(np.arange(target.size), K, replace=False, p=w)]
+    positions_2d = random.normal(subkey3, shape=(80, 2))
+    weights_2d = jnp.ones(80) / 80
+    target_2d = PointCloud(positions_2d, weights_2d)
 
-    for _ in range(n_iter):
-        # E-step: softly assign points to centers using KDTree
-        tree = KDTree(x)
-        d, i = tree.query(y, k=k)
+    key, subkey4 = random.split(key)
+    test_rotation = random_rotation(subkey4)
 
-        # Initialize sigma if not already set
-        if sigma is None:
-            sigma = np.sqrt(np.dot(w, np.square(np.min(d, axis=1))))
+    # Test KernelCorrelation with brute force in 3D-3D scenario
+    print("\n1. Testing KernelCorrelation (3D-3D) with brute force...")
+    kc_3d = KernelCorrelation(target_3d, source_3d, sigma=0.5, k=10, use_kdtree=False)
 
-        # Compute assignment probabilities
-        p = -0.5 * d**2 / sigma**2
-        p -= logsumexp(p, axis=1)[:, None]
-        np.exp(p, out=p)
+    log_prob_3d = kc_3d.log_prob(test_rotation)
+    print(f"  Log probability: {log_prob_3d}")
 
-        # M-step: update sigma
-        sigma = np.sqrt(np.sum(w[:, None] * p * np.square(d)) / 2)
+    try:
+        # Automatic gradient
+        grad_3d = kc_3d.gradient(test_rotation)
+        print(f"  Automatic gradient: {grad_3d}")
 
-        # Update centers (x) based on assignment probabilities
-        n = ndi.sum_labels(w[:, None] * p, i, index=np.arange(K))
-        x = np.array(
-            [ndi.sum_labels((w * yy)[:, None] * p, i, index=np.arange(K)) for yy in y.T]
+        # Numerical gradient
+        num_grad_3d = compute_numerical_gradient(kc_3d, test_rotation)
+        print(f"  Numerical gradient: {num_grad_3d}")
+
+        # Compute relative difference
+        grad_diff = jnp.linalg.norm(grad_3d - num_grad_3d)
+        grad_rel_diff = grad_diff / (jnp.linalg.norm(grad_3d) + 1e-10)
+        print(f"  Gradient difference (L2 norm): {grad_diff}")
+        print(f"  Relative difference: {grad_rel_diff:.6f}")
+
+        # Check if gradients are close enough
+        is_close = grad_rel_diff < 0.1  # 10% tolerance
+        print(
+            f"  {'\u2705' if is_close else '\u274c'} Gradients are {'close' if is_close else 'not close'}"
         )
-        x = (x / n).T
 
-    return x, sigma
+        print("  \u2705 Gradient computation successful!")
+    except Exception as e:
+        print(f"  \u274c Gradient computation failed: {e}")
+
+    # Test MixtureSphericalGaussians with brute force in 3D-2D scenario
+    print("\n2. Testing MixtureSphericalGaussians (3D-2D) with brute force...")
+    msg_3d2d = MixtureSphericalGaussians(
+        target_2d, projection_source, sigma=0.5, k=10, use_kdtree=False
+    )
+
+    log_prob_3d2d = msg_3d2d.log_prob(test_rotation)
+    print(f"  Log probability: {log_prob_3d2d}")
+
+    try:
+        # Automatic gradient
+        grad_3d2d = msg_3d2d.gradient(test_rotation)
+        print(f"  Automatic gradient: {grad_3d2d}")
+
+        # Numerical gradient
+        num_grad_3d2d = compute_numerical_gradient(msg_3d2d, test_rotation)
+        print(f"  Numerical gradient: {num_grad_3d2d}")
+
+        # Compute relative difference
+        grad_diff_3d2d = jnp.linalg.norm(grad_3d2d - num_grad_3d2d)
+        grad_rel_diff_3d2d = grad_diff_3d2d / (jnp.linalg.norm(grad_3d2d) + 1e-10)
+        print(f"  Gradient difference (L2 norm): {grad_diff_3d2d}")
+        print(f"  Relative difference: {grad_rel_diff_3d2d:.6f}")
+
+        # Check if gradients are close enough
+        is_close_3d2d = grad_rel_diff_3d2d < 0.1  # 10% tolerance
+        print(
+            f"  {'\u2705' if is_close_3d2d else '\u274c'} Gradients are {'close' if is_close_3d2d else 'not close'}"
+        )
+
+        print("  \u2705 Gradient computation successful!")
+    except Exception as e:
+        print(f"  \u274c Gradient computation failed: {e}")
+
+    # Check optimization direction - do gradients point toward true rotation?
+    q_diff = test_rotation - true_rotation
+    dot_product = jnp.dot(grad_3d, -q_diff)  # Negative because we're maximizing
+    print("\nOptimization direction check:")
+    print(f"  Dot product with direction to true rotation: {dot_product}")
+    print(
+        f"  {'\u2705' if dot_product > 0 else '\u274c'} Gradient points {'toward' if dot_product > 0 else 'away from'} the true rotation"
+    )
+
+    # Summary
+    if is_close and is_close_3d2d:
+        print(
+            "\n\u2705 GRADIENT VALIDATION PASSED: Automatic gradients match numerical approximations!"
+        )
+    else:
+        issues = []
+        if not is_close:
+            issues.append(
+                "KernelCorrelation gradients don't match numerical approximation"
+            )
+        if not is_close_3d2d:
+            issues.append(
+                "MixtureSphericalGaussians gradients don't match numerical approximation"
+            )
+        print(f"\n✗ GRADIENT VALIDATION FAILED: {', '.join(issues)}")
 
 
 if __name__ == "__main__":
-    class_avg_idx = 10  # default 1
-    image = load_class_average(class_avg_idx)
-    target_cloud = pointcloud_from_class_avg(image)
-
-    # load 3D model
-    n_particles = (1000, 2000)[1]
-    model_3d = np.load(f"data/ribosome/model3d_{n_particles}.npz")
-
-    # initialize it as source, an instance of ProjectionRotation
-    source_cloud = RotationProjection(model_3d["positions"], model_3d["weights"])
-    source_cloud.positions -= source_cloud.center_of_mass
-
-    # best fit to estimate the points and a scalar sigma
-    positions_fit2d, sigma = fit_model2d(target_cloud, n_particles, n_iter=100, k=50)
-
-    # initialize correlation
-    log_density_kc = KernelCorrelation(
-        target_cloud, source_cloud, sigma, k=20, beta=20.0
-    )
-
-    # test unit quaternion
-    test_q = sample_sphere(3, seed=1234)
-    print("Test quaternion:", test_q)
-
-    analytical_grad = log_density_kc.gradient(test_q)
-    print("Analytical gradient:", analytical_grad)
-
-    numerical_grad = approx_fprime(test_q, log_density_kc.log_prob)
-    print("Numerical gradient:", numerical_grad)
-
-    relative_error = np.linalg.norm(analytical_grad - numerical_grad) / np.linalg.norm(
-        numerical_grad
-    )
-    print(f"Relative error: {relative_error:.3e}")
+    test_gradient_flow()
