@@ -16,6 +16,9 @@ NOTE: Currently we are only interested in sampling rotations and ignore translat
 is set everywhere. If needed, we could add support for translations in the future.
 """
 
+# TODO: Note that this implementation still has implementation issues, such as `kd_tree_nn`
+# via `jax.pure_callback` causes issues with grad flow. I assumed `jax.lax.stop_gradient`.
+# test implementation via `examples/test_grad.py` and `examples/benchamark_scores_3d3d.py`
 import warnings
 from dataclasses import dataclass
 from functools import partial
