@@ -64,6 +64,7 @@ all = [
     { name = "corner" },
     { name = "ipykernel" },
     { name = "matplotlib" },
+    { name = "mrcfile" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "ruff" },
@@ -75,6 +76,7 @@ all-gpu = [
     { name = "ipykernel" },
     { name = "jax", extra = ["cuda12"] },
     { name = "matplotlib" },
+    { name = "mrcfile" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "ruff" },
@@ -91,6 +93,7 @@ viz = [
     { name = "arviz" },
     { name = "corner" },
     { name = "matplotlib" },
+    { name = "mrcfile" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "seaborn" },
@@ -107,6 +110,7 @@ requires-dist = [
     { name = "jax", extras = ["cuda12"], marker = "extra == 'gpu'", specifier = ">=0.6.0" },
     { name = "joblib", specifier = ">=1.5.0" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.10.1" },
+    { name = "mrcfile", marker = "extra == 'viz'", specifier = ">=1.5.4" },
     { name = "numpy", specifier = ">=2.2.5" },
     { name = "pandas", marker = "extra == 'viz'", specifier = ">=2.2.3" },
     { name = "plotly", marker = "extra == 'viz'", specifier = ">=6.0.1" },
@@ -833,6 +837,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/52/38/703169100fdde27957f061d4d0ea3e00525775a09acaccf7e655d9609d55/ml_dtypes-0.5.1-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:05f23447a1c20ddf4dc7c2c661aa9ed93fcb2658f1017c204d1e758714dc28a8", size = 693043, upload-time = "2025-01-07T03:34:38.457Z" },
     { url = "https://files.pythonhosted.org/packages/28/ff/4e234c9c23e0d456f5da5a326c103bf890c746d93351524d987e41f438b3/ml_dtypes-0.5.1-cp313-cp313t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1b7fbe5571fdf28fd3aaab3ef4aafc847de9ebf263be959958c1ca58ec8eadf5", size = 4903946, upload-time = "2025-01-07T03:34:40.236Z" },
     { url = "https://files.pythonhosted.org/packages/b7/45/c1a1ccfdd02bc4173ca0f4a2d327683a27df85797b885eb1da1ca325b85c/ml_dtypes-0.5.1-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d13755f8e8445b3870114e5b6240facaa7cb0c3361e54beba3e07fa912a6e12b", size = 5052731, upload-time = "2025-01-07T03:34:45.308Z" },
+]
+
+[[package]]
+name = "mrcfile"
+version = "1.5.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/56/22/8834f44c2455291e241fb2543c2d5d4f0fe58fd63ad0f42e86570f0b1161/mrcfile-1.5.4.tar.gz", hash = "sha256:8fa9eb2e237d87d99b301c61bf02854dd85a451db25eefcbe142c09b36d8d601", size = 52052606, upload-time = "2025-01-22T12:36:10.924Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/cb/3f4ee8233f30c7926f1ed4885ff32b79ec7ce3210370f43e1cb2b385bed6/mrcfile-1.5.4-py2.py3-none-any.whl", hash = "sha256:195370a13db5ce19600499f9bdf90fd9888979bf39de19a17c19024436c6f4c2", size = 45012, upload-time = "2025-01-22T12:02:38.502Z" },
 ]
 
 [[package]]

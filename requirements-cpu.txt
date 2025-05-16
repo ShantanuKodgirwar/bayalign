@@ -70,6 +70,8 @@ ml-dtypes==0.5.1
     # via
     #   jax
     #   jaxlib
+mrcfile==1.5.4
+    # via bayalign
 narwhals==1.39.0
     # via plotly
 nest-asyncio==1.6.0
@@ -84,6 +86,7 @@ numpy==2.2.5
     #   jaxlib
     #   matplotlib
     #   ml-dtypes
+    #   mrcfile
     #   pandas
     #   scipy
     #   seaborn
