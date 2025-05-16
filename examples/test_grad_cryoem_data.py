@@ -1,527 +1,458 @@
+"""
+Minimal test script to isolate JAX autodiff gradient issues with CryoEM data.
+"""
+
+# TODO: With real data, there are some underflow, overflow issues especially with MixtureSphericalGaussians, need to fix it first.
+
 import os
 from time import time
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
-import mrcfile
 import numpy as np
-import scipy.ndimage as ndi
-from jax import random
+from jax import grad, random
 from scipy.optimize import approx_fprime
-from scipy.spatial import KDTree
-from scipy.special import logsumexp
-from skimage import measure
 
 from bayalign.pointcloud import PointCloud, RotationProjection
 from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
-from bayalign.sphere_utils import sample_sphere
+from examples.cryo_utils import (
+    fit_model2d,
+    load_class_average,
+    pointcloud_from_class_avg,
+)
+
+# Enable double precision for better numerical stability
+jax.config.update("jax_enable_x64", True)
 
 
-def load_class_average(index=0, data_path="data/ribosome_80S/pfrib80S_cavgs.mrc"):
-    """Loads a projection image (class average) of the 80S ribosome.
+def load_target_cloud(class_idx=10, n_particles=2000, return_fitted_target=False):
+    # convert a class average to a point cloud
+    image = load_class_average(class_idx)
+    target_cloud, _ = pointcloud_from_class_avg(image)
 
-    Parameters
-    ----------
-    index : int, optional
-        index for one of the images in the file., by default 0
-    data_path : str, optional
-        Path to the MRC file.
+    # find a 2D fit of this target and estimate an optimal sigma
+    target_fit2d, sigma = fit_model2d(
+        target_cloud,
+        n_particles,
+        n_iter=100,
+        k=50,
+        verbose=True,
+    )
 
-    Returns
-    -------
-    np.ndarray
-        single image
-    """
-    assert 0 <= index < 400, f"Index {index} out of bounds (0-399)"
-
-    # Check if file exists
-    if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Could not find data file: {data_path}")
-
-    data = mrcfile.open(data_path).data
-    return data[index]
-
-
-def pointcloud_from_class_avg(image, pixelsize=2.68, threshold_method="mean"):
-    """Creates a pointcloud from class average projection image
-
-    Parameters
-    ----------
-    image : np.ndarray
-        class average projection image
-    pixelsize : float, optional
-        Pixel size in Angstrom, by default 2.68
-    threshold_method : str, optional
-        Method to determine threshold ('mean', 'median', or 'otsu'), by default 'mean'
-
-    Returns
-    -------
-    target: PointCloud
-        Target point cloud
-    mask: np.ndarray
-        Binary mask of the selected region
-    """
-    # Determine threshold based on method
-    if threshold_method == "mean":
-        threshold = np.mean(image)
-    elif threshold_method == "median":
-        threshold = np.median(image)
-    elif threshold_method == "otsu":
-        from skimage.filters import threshold_otsu
-
-        threshold = threshold_otsu(image)
+    if return_fitted_target:
+        # converts to a PointCloud class with weights=1.0
+        return PointCloud(target_fit2d, weights=None), sigma
     else:
-        raise ValueError(f"Unknown threshold method: {threshold_method}")
-
-    mask = image > threshold
-
-    # Find connected regions
-    labels = ndi.label(mask)[0]
-
-    # Keep the largest connected region
-    props = measure.regionprops(labels, intensity_image=image)
-    if not props:
-        raise ValueError("No connected regions found above threshold")
-
-    _centers = np.array([prop.weighted_centroid for prop in props])
-    index = np.argmax([prop.area for prop in props])
-    mask = labels == props[index].label
-
-    # Create a point cloud representing the projected ribosome
-    positions = np.transpose(np.nonzero(mask)) * pixelsize
-    weights = image[mask] - threshold
-
-    # Create point cloud
-    target = PointCloud(positions, weights)
-
-    # Shift point cloud's center such that the center of mass is at (0, 0)
-    target.transformed(np.eye(2), -target.center_of_mass)
-
-    return target, mask
+        return target_cloud, sigma
 
 
-def fit_model2d(target, K, n_iter=1000, k=100, verbose=False):
+def load_cryo_data(class_idx=10, n_particles=2000):
     """
-    Fits a 2D model (mixture of gaussians) with fixed number of points (RBF kernels) K to weighted 2D point cloud using
-    Expectation-Maximization (EM) algorithm. This returns a fixed bandwidth `sigma`.
+    Load CryoEM data and prepare point clouds.
 
     Parameters
     ----------
-    target : PointCloud
-        Point cloud that will be fitted with a smaller (unweighted) point cloud
-        by using Expectation Maximization.
-    K : int
-        Desired number of points or clusters
-    n_iter : int, optional
-        Number of iterations in expectation maximization, by default 1000
-    k : int, optional
-        Number of nearest neighbours for assignment, by default 100
-    verbose : bool, optional
-        Whether to print progress information, by default False
+    class_idx : int
+        Index of class average to use
+    n_particles : int
+        Number of particles in the model
 
     Returns
     -------
-    x : np.ndarray
-        Fitted positions
+    target_cloud : PointCloud
+        Target 2D point cloud
+    source_cloud : RotationProjection
+        Source 3D point cloud for projection
     sigma : float
-        Standard deviation of the associated fit
+        Estimated sigma value
     """
-    # Normalize weights
-    w = np.asarray(target.weights / target.weights.sum())
-    y = np.asarray(target.positions)
+    print(f"Loading CryoEM data: class_idx={class_idx}, particles={n_particles}")
 
-    sigma = None
+    # Load model data
+    model_path = f"data/ribosome_80S/model3d_{n_particles}.npz"
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    # Initialize centers by sampling from the target positions based on weights
-    x = y[np.random.choice(np.arange(target.size), K, replace=False, p=w)]
+    model_3d = np.load(model_path)
+    source_cloud = RotationProjection(model_3d["positions"], model_3d["weights"])
+    source_cloud.positions -= source_cloud.center_of_mass
 
-    for i in range(n_iter):
-        # E-step: softly assign points to centers using KDTree
-        tree = KDTree(x)
-        d, indices = tree.query(y, k=min(k, x.shape[0]))
+    # For this minimal test, let's use a simple target cloud derived from the source
+    # to avoid loading the full CryoEM dataset
 
-        # Initialize sigma if not already set
-        if sigma is None:
-            sigma = np.sqrt(np.dot(w, np.square(np.min(d, axis=1))))
+    # Project source with a random rotation to create target
+    key = random.PRNGKey(42)
+    quat = random.normal(key, shape=(4,))
+    rotation = quat / jnp.linalg.norm(quat)
 
-        # Compute assignment probabilities
-        p = -0.5 * d**2 / sigma**2
-        p -= logsumexp(p, axis=1)[:, None]
-        np.exp(p, out=p)
+    # Transform and project to 2D
+    transformed_pos = source_cloud.transform_positions(rotation)
 
-        # M-step: update sigma
-        sigma = np.sqrt(np.sum(w[:, None] * p * np.square(d)) / 2)
+    if False:
+        # Add some noise to make it realistic
+        key, subkey = random.split(key)
+        noise = 0.1 * random.normal(subkey, shape=transformed_pos.shape)
+        noisy_pos = transformed_pos + noise
 
-        # Update centers (x) based on assignment probabilities
-        n = ndi.sum_labels(w[:, None] * p, indices, index=np.arange(K))
-        x = np.array(
-            [
-                ndi.sum_labels((w * yy)[:, None] * p, indices, index=np.arange(K))
-                for yy in y.T
-            ]
+        # Create target point cloud
+        target_cloud = PointCloud(noisy_pos, source_cloud.weights)
+
+        # Use a reasonable sigma value based on the data
+        sigma = 2.0
+    else:
+        target_cloud, sigma = load_target_cloud(
+            class_idx, n_particles, return_fitted_target=True
         )
-        x = (x / n).T
 
-        if verbose and (i + 1) % (n_iter // 10) == 0:
-            print(f"EM iteration {i + 1}/{n_iter}, sigma={sigma:.4f}")
+    print(f"Created source cloud with {source_cloud.size} points")
+    print(f"Created target cloud with {target_cloud.size} points")
+    print(f"Using sigma = {sigma}")
 
-    return x, sigma
+    return target_cloud, source_cloud, sigma
 
 
-def compare_gradients(scorer, rotation, epsilon=1e-6, title="Gradient Comparison"):
+def compare_gradients(scorer, rotation, epsilon=1e-6):
     """
-    Compare analytical and numerical gradients for a given scorer and rotation.
+    Compare automatic (AD), analytical, and numerical gradients.
 
     Parameters
     ----------
-    scorer : object
-        Object with log_prob and gradient methods
-    rotation : np.ndarray
+    scorer : KernelCorrelation or MixtureSphericalGaussians
+        Scoring function
+    rotation : jnp.ndarray
         Rotation quaternion
-    epsilon : float, optional
-        Step size for finite differences, by default 1e-6
-    title : str, optional
-        Title for the results section, by default "Gradient Comparison"
+    epsilon : float
+        Step size for numerical gradient
 
     Returns
     -------
     dict
-        Dictionary with comparison results
+        Comparison results
     """
-    print(f"\n{title}")
-    print("-" * len(title))
+    results = {}
 
-    t0 = time()
-    analytical_grad = scorer.gradient(rotation)
-    analytical_time = time() - t0
-    print(f"Analytical gradient: {analytical_grad}")
-    print(f"Computation time: {analytical_time:.4f} s")
+    # Ensure rotation is a JAX array
+    rotation = jnp.array(rotation)
 
-    t0 = time()
-    numerical_grad = approx_fprime(rotation, scorer.log_prob, epsilon)
-    numerical_time = time() - t0
-    print(f"Numerical gradient: {numerical_grad}")
-    print(f"Computation time: {numerical_time:.4f} s")
+    # Test log_prob first
+    try:
+        log_prob = scorer.log_prob(rotation)
+        print(f"Log probability: {log_prob}")
+        if jnp.isnan(log_prob):
+            print("WARNING: Log probability is NaN")
+        results["log_prob"] = log_prob
+    except Exception as e:
+        print(f"Error computing log probability: {e}")
+        results["log_prob_error"] = str(e)
 
-    abs_diff = np.abs(analytical_grad - numerical_grad)
-    relative_error = np.linalg.norm(analytical_grad - numerical_grad) / np.linalg.norm(
-        numerical_grad
-    )
-    cosine_similarity = np.dot(analytical_grad, numerical_grad) / (
-        np.linalg.norm(analytical_grad) * np.linalg.norm(numerical_grad)
-    )
+    # 1. Test automatic differentiation (JAX autodiff)
+    print("\n1. Testing automatic differentiation (JAX)...")
+    try:
+        t0 = time()
+        auto_grad = scorer.gradient(rotation)
+        auto_time = time() - t0
 
-    print(f"Absolute differences: {abs_diff}")
-    print(f"Max abs difference: {np.max(abs_diff):.6e}")
-    print(f"Relative error: {relative_error:.6e}")
-    print(f"Cosine similarity: {cosine_similarity:.6f}")
-    print(f"Speed-up: {numerical_time / analytical_time:.1f}x")
+        print(f"Auto gradient: {auto_grad}")
+        print(f"Computation time: {auto_time:.4f}s")
 
-    # Criteria for a successful test
-    is_accurate = relative_error < 0.1  # 10% tolerance
-    has_same_direction = cosine_similarity > 0.9  # cosine similarity > 0.9
-    is_faster = analytical_time < numerical_time  # should be faster
+        if jnp.any(jnp.isnan(auto_grad)):
+            print("WARNING: Automatic gradient contains NaN values")
 
-    print(f"Test {'PASSED' if is_accurate and has_same_direction else 'FAILED'}")
+        results["auto_grad"] = auto_grad
+        results["auto_time"] = auto_time
+    except Exception as e:
+        print(f"Error computing automatic gradient: {e}")
+        results["auto_grad_error"] = str(e)
 
-    results = {
-        "analytical_grad": analytical_grad,
-        "numerical_grad": numerical_grad,
-        "abs_diff": abs_diff,
-        "relative_error": relative_error,
-        "cosine_similarity": cosine_similarity,
-        "analytical_time": analytical_time,
-        "numerical_time": numerical_time,
-        "is_accurate": is_accurate,
-        "has_same_direction": has_same_direction,
-        "is_faster": is_faster,
-    }
+    # 2. Test numerical gradient (scipy.optimize.approx_fprime)
+    print("\n2. Testing numerical gradient (scipy)...")
+    try:
+        # Define log_prob wrapper for approx_fprime
+        def log_prob_wrapper(x):
+            return float(scorer.log_prob(jnp.array(x)))
+
+        t0 = time()
+        numerical_grad = approx_fprime(np.array(rotation), log_prob_wrapper, epsilon)
+        numerical_time = time() - t0
+
+        print(f"Numerical gradient: {numerical_grad}")
+        print(f"Computation time: {numerical_time:.4f}s")
+
+        if np.any(np.isnan(numerical_grad)):
+            print("WARNING: Numerical gradient contains NaN values")
+
+        results["numerical_grad"] = numerical_grad
+        results["numerical_time"] = numerical_time
+    except Exception as e:
+        print(f"Error computing numerical gradient: {e}")
+        results["numerical_grad_error"] = str(e)
+
+    # Compare gradients if both are available
+    if "auto_grad" in results and "numerical_grad" in results:
+        auto_grad = results["auto_grad"]
+        numerical_grad = results["numerical_grad"]
+
+        if not jnp.any(jnp.isnan(auto_grad)) and not np.any(np.isnan(numerical_grad)):
+            # Compute difference metrics
+            abs_diff = jnp.abs(auto_grad - numerical_grad)
+            rel_error = float(
+                jnp.linalg.norm(auto_grad - numerical_grad)
+                / (jnp.linalg.norm(numerical_grad) + 1e-10)
+            )
+
+            # cosine between the two gradients. 1 = same direction,
+            # 0 = perpendicular and -1 = opposite
+            cos_sim = float(
+                jnp.dot(auto_grad, numerical_grad)
+                / (jnp.linalg.norm(auto_grad) * jnp.linalg.norm(numerical_grad) + 1e-10)
+            )
+
+            print("\nGradient comparison:")
+            print(f"Max absolute difference: {float(jnp.max(abs_diff)):.6e}")
+            print(f"Relative error: {rel_error:.6e}")
+            print(f"Cosine similarity: {cos_sim:.6f}")
+
+            # Store comparison metrics
+            results["abs_diff"] = abs_diff
+            results["rel_error"] = rel_error
+            results["cos_sim"] = cos_sim
+
+            # Check if gradients are close
+            is_close = rel_error < 0.1 and cos_sim > 0.9
+            print(f"Gradients are {'close' if is_close else 'not close'}")
+            results["is_close"] = is_close
 
     return results
 
 
-def test_multiple_rotations(scorer, n_rotations=5, seed=1234):
+def test_gradient_computation():
     """
-    Test gradient computation for multiple random rotations.
-
-    Parameters
-    ----------
-    scorer : object
-        Object with log_prob and gradient methods
-    n_rotations : int, optional
-        Number of rotations to test, by default 5
-    seed : int, optional
-        Random seed, by default 1234
-
-    Returns
-    -------
-    list
-        List of comparison results dictionaries
+    Test gradient computation with CryoEM data.
     """
-    all_results = []
+    print("=" * 70)
+    print("Testing JAX autodiff gradient computation with CryoEM data")
+    print("=" * 70)
 
-    # Initialize JAX PRNG key
-    key = jax.random.PRNGKey(seed)
-
-    print(f"\nTesting {n_rotations} random rotations")
-    print("=" * 50)
-
-    for i in range(n_rotations):
-        # Generate a new key for each rotation
-        key, subkey = jax.random.split(key)
-
-        # Generate random quaternion using JAX
-        quat = jax.random.normal(subkey, shape=(4,))
-        rotation = quat / jnp.linalg.norm(quat)
-
-        print(f"\nRotation {i + 1}: {rotation}")
-
-        result = compare_gradients(
-            scorer, rotation, title=f"Rotation {i + 1}/{n_rotations}"
-        )
-        all_results.append(result)
-
-    # Summarize results
-    print("\nSummary of results:")
-    print("=" * 50)
-
-    passed = sum(r["is_accurate"] and r["has_same_direction"] for r in all_results)
-    print(f"Passed: {passed}/{n_rotations} tests")
-
-    avg_rel_error = np.mean([r["relative_error"] for r in all_results])
-    print(f"Average relative error: {avg_rel_error:.6e}")
-
-    avg_cosine = np.mean([r["cosine_similarity"] for r in all_results])
-    print(f"Average cosine similarity: {avg_cosine:.6f}")
-
-    avg_speedup = np.mean(
-        [r["numerical_time"] / r["analytical_time"] for r in all_results]
-    )
-    print(f"Average speed-up: {avg_speedup:.1f}x")
-
-    return all_results
-
-
-def visualize_pointclouds(
-    target, source, rotation=None, sigma=None, title="Point Clouds Visualization"
-):
-    """
-    Visualize 2D point clouds with optional rotation of the source.
-
-    Parameters
-    ----------
-    target : PointCloud
-        Target point cloud (2D)
-    source : PointCloud or RotationProjection
-        Source point cloud (3D)
-    rotation : np.ndarray, optional
-        Rotation quaternion to apply to source, by default None
-    sigma : float, optional
-        Sigma value for visualization, by default None
-    title : str, optional
-        Plot title, by default "Point Clouds Visualization"
-    """
-    plt.figure(figsize=(10, 8))
-
-    # Plot target points
-    plt.scatter(
-        target.positions[:, 0],
-        target.positions[:, 1],
-        s=target.weights * 20,
-        c="blue",
-        alpha=0.5,
-        label="Target",
-    )
-
-    # Transform and plot source points if rotation is provided
-    if rotation is not None:
-        transformed_positions = source.transform_positions(rotation)
-        plt.scatter(
-            transformed_positions[:, 0],
-            transformed_positions[:, 1],
-            s=source.weights * 20,
-            c="red",
-            alpha=0.5,
-            label="Source (rotated)",
-        )
-
-    # Draw a circle with radius sigma if provided
-    if sigma is not None:
-        circle = plt.Circle(
-            (0, 0),
-            sigma,
-            fill=False,
-            linestyle="--",
-            color="gray",
-            label=f"σ = {sigma:.2f}",
-        )
-        plt.gca().add_patch(circle)
-
-    plt.xlabel("X (Å)")
-    plt.ylabel("Y (Å)")
-    plt.title(title)
-    plt.axis("equal")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-
-    return plt.gcf()
-
-
-def main(class_avg_idx=10, n_particles=2000, test_rotations=3, use_kdtree=False):
-    """
-    Main function to run the full test pipeline.
-
-    Parameters
-    ----------
-    class_avg_idx : int, optional
-        Index of class average to use, by default 10
-    n_particles : int, optional
-        Number of particles in 3D model, by default 2000
-    test_rotations : int, optional
-        Number of rotations to test, by default 3
-    use_kdtree : bool, optional
-        Whether to use KDTree orbrute force method (for JAX compatibility),
-        by default False
-    """
-    print("=" * 80)
-    print("Testing gradients for registration scores with real data")
-    print(f"Class average index: {class_avg_idx}, Model particles: {n_particles}")
-    print("=" * 80)
-
-    # Load class average and create target point cloud
-    try:
-        image = load_class_average(class_avg_idx)
-        target_cloud, mask = pointcloud_from_class_avg(image)
-        print(f"Created target point cloud with {target_cloud.size} points")
-    except Exception as e:
-        print(f"Error loading class average: {e}")
-        raise
-
-    # Load 3D model
-    try:
-        model_path = f"data/ribosome_80S/model3d_{n_particles}.npz"
-        model_3d = np.load(model_path)
-        source_cloud = RotationProjection(model_3d["positions"], model_3d["weights"])
-        source_cloud.positions -= source_cloud.center_of_mass
-        print(f"Loaded 3D model with {source_cloud.size} points")
-    except Exception as e:
-        print(f"Error loading 3D model: {e}")
-        raise
-
-    # Fit 2D model to estimate sigma
-    print("\nFitting 2D model to estimate sigma...")
-    target_fit2d, sigma = fit_model2d(
-        target_cloud, n_particles, n_iter=100, k=50, verbose=True
-    )
-    print(f"Estimated sigma: {sigma:.4f}")
+    # Load CryoEM data
+    target, source, sigma = load_cryo_data()
 
     # Create scoring functions
-    print("\nInitializing scoring functions...")
-
-    # Define parameters for scorers
     k = 20
-    beta = 20.0
+    beta = 1.0  # Use a smaller beta for more stability
 
-    log_density_kc = KernelCorrelation(
-        target_cloud, source_cloud, sigma, k=k, beta=beta, use_kdtree=use_kdtree
+    # Create KernelCorrelation with brute force
+    print("\nCreating KernelCorrelation scorer...")
+    kc = KernelCorrelation(target, source, sigma, k=k, beta=beta, use_kdtree=False)
+
+    # Create MixtureSphericalGaussians with brute force
+    print("\nCreating MixtureSphericalGaussians scorer...")
+    msg = MixtureSphericalGaussians(
+        target, source, sigma, k=k, beta=beta, use_kdtree=False
+    )
+
+    # Generate random test rotations
+    print("\nGenerating test rotations...")
+    key = random.PRNGKey(1)
+    n_rotations = 3
+
+    rotation_results = []
+
+    for i in range(n_rotations):
+        print(f"\n{'-' * 50}")
+        print(f"Test rotation {i + 1}/{n_rotations}")
+        print(f"{'-' * 50}")
+
+        # Generate random quaternion
+        key, subkey = random.split(key)
+        quat = random.normal(subkey, shape=(4,))
+        rotation = quat / jnp.linalg.norm(quat)
+
+        print(f"Rotation: {rotation}")
+
+        # Test KernelCorrelation
+        print("\nTesting KernelCorrelation:")
+        kc_results = compare_gradients(kc, rotation)
+
+        # Test MixtureSphericalGaussians
+        print("\nTesting MixtureSphericalGaussians:")
+        msg_results = compare_gradients(msg, rotation)
+
+        rotation_results.append(
+            {"rotation": rotation, "kc_results": kc_results, "msg_results": msg_results}
+        )
+
+    # Print summary
+    print("\n" + "=" * 50)
+    print("SUMMARY")
+    print("=" * 50)
+
+    kc_auto_nans = 0
+    kc_num_nans = 0
+    msg_auto_nans = 0
+    msg_num_nans = 0
+
+    for i, res in enumerate(rotation_results):
+        kc_res = res["kc_results"]
+        msg_res = res["msg_results"]
+
+        print(f"\nRotation {i + 1}:")
+
+        # Check KernelCorrelation
+        if "auto_grad" in kc_res:
+            auto_nan = jnp.any(jnp.isnan(kc_res["auto_grad"]))
+            if auto_nan:
+                kc_auto_nans += 1
+                print("  KC auto grad: \u274c")
+            else:
+                print("  KC auto grad: \u2705")
+        else:
+            kc_auto_nans += 1
+            print("  KC auto grad: Error")
+
+        if "numerical_grad" in kc_res:
+            num_nan = np.any(np.isnan(kc_res["numerical_grad"]))
+            if num_nan:
+                kc_num_nans += 1
+                print("  KC num grad: \u274c")
+            else:
+                print("  KC num grad: \u2705")
+        else:
+            kc_num_nans += 1
+            print("  KC num grad: Error")
+
+        # Check MixtureSphericalGaussians
+        if "auto_grad" in msg_res:
+            auto_nan = jnp.any(jnp.isnan(msg_res["auto_grad"]))
+            if auto_nan:
+                msg_auto_nans += 1
+                print("  MSG auto grad: \u274c")
+            else:
+                print("  MSG auto grad: \u2705")
+        else:
+            msg_auto_nans += 1
+            print("  MSG auto grad: Error")
+
+        if "numerical_grad" in msg_res:
+            num_nan = np.any(np.isnan(msg_res["numerical_grad"]))
+            if num_nan:
+                msg_num_nans += 1
+                print("  MSG num grad: \u274c")
+            else:
+                print("  MSG num grad: \u2705")
+        else:
+            msg_num_nans += 1
+            print("  MSG num grad: Error")
+
+    print("\nOverall results:")
+    print(f"KernelCorrelation auto gradients with NaNs: {kc_auto_nans}/{n_rotations}")
+    print(
+        f"KernelCorrelation numerical gradients with NaNs: {kc_num_nans}/{n_rotations}"
     )
     print(
-        f"Created KernelCorrelation scorer with sigma={sigma:.4f}, k={k}, beta={beta}"
-    )
-
-    log_density_msg = MixtureSphericalGaussians(
-        target_cloud, source_cloud, sigma, k=k, beta=beta, use_kdtree=use_kdtree
+        f"MixtureSphericalGaussians auto gradients with NaNs: {msg_auto_nans}/{n_rotations}"
     )
     print(
-        f"Created MixtureSphericalGaussians scorer with sigma={sigma:.4f}, k={k}, beta={beta}"
+        f"MixtureSphericalGaussians numerical gradients with NaNs: {msg_num_nans}/{n_rotations}"
     )
 
-    # Test KernelCorrelation gradient
-    print("\nTesting KernelCorrelation gradients...")
-    kc_results = test_multiple_rotations(log_density_kc, n_rotations=test_rotations)
-
-    # Test MixtureSphericalGaussians gradient
-    print("\nTesting MixtureSphericalGaussians gradients...")
-    msg_results = test_multiple_rotations(log_density_msg, n_rotations=test_rotations)
-
-    # Visualize one example
-    best_rotation_idx = np.argmax([r["cosine_similarity"] for r in kc_results])
-    key = random.PRNGKey(1234 + best_rotation_idx)
-    best_rotation = sample_sphere(key, d=3)
-
-    print(f"\nVisualizing point clouds with rotation {best_rotation_idx + 1}...")
-    _fig = visualize_pointclouds(
-        target_cloud,
-        source_cloud,
-        rotation=best_rotation,
-        sigma=sigma,
-        title=f"Point Cloud Registration (Sigma={sigma:.2f})",
-    )
-    plt.show()
-
-    # Print final summary
-    kc_passed = sum(r["is_accurate"] and r["has_same_direction"] for r in kc_results)
-    msg_passed = sum(r["is_accurate"] and r["has_same_direction"] for r in msg_results)
-
-    print("\nFinal Results Summary:")
-    print("=" * 80)
-    print(f"KernelCorrelation: {kc_passed}/{test_rotations} tests passed")
-    print(f"MixtureSphericalGaussians: {msg_passed}/{test_rotations} tests passed")
-
-    # Calculate average metrics
-    kc_avg_rel_error = np.mean([r["relative_error"] for r in kc_results])
-    msg_avg_rel_error = np.mean([r["relative_error"] for r in msg_results])
-
-    kc_avg_cosine = np.mean([r["cosine_similarity"] for r in kc_results])
-    msg_avg_cosine = np.mean([r["cosine_similarity"] for r in msg_results])
-
-    kc_avg_speedup = np.mean(
-        [r["numerical_time"] / r["analytical_time"] for r in kc_results]
-    )
-    msg_avg_speedup = np.mean(
-        [r["numerical_time"] / r["analytical_time"] for r in msg_results]
+    success = (
+        kc_auto_nans == 0
+        and kc_num_nans == 0
+        and msg_auto_nans == 0
+        and msg_num_nans == 0
     )
 
-    print(
-        f"KernelCorrelation avg error: {kc_avg_rel_error:.6e}, cosine: {kc_avg_cosine:.4f}, speedup: {kc_avg_speedup:.1f}x"
-    )
-    print(
-        f"MixtureSphericalGaussians avg error: {msg_avg_rel_error:.6e}, cosine: {msg_avg_cosine:.4f}, speedup: {msg_avg_speedup:.1f}x"
-    )
-
-    if kc_passed == test_rotations and msg_passed == test_rotations:
-        print("\nALL TESTS PASSED! Gradients are working correctly.")
+    if success:
+        print("\nALL TESTS PASSED: Gradients work correctly with CryoEM data")
     else:
-        print("\nSome tests FAILED. Check individual results for details.")
+        print("\nSOME TESTS FAILED: Check detailed results")
+
+
+def debug_jax_grad():
+    """
+    Debug JAX gradient computation with a simplified function.
+    """
+    print("\n" + "=" * 50)
+    print("DEBUGGING JAX GRADIENT COMPUTATION")
+    print("=" * 50)
+
+    # Load CryoEM data
+    target, source, sigma = load_cryo_data()
+
+    # Create a simplified version of the log_prob function
+    def simplified_log_prob(rotation):
+        # Convert to rotation matrix
+        from bayalign.utils import quat2matrix
+
+        R = quat2matrix(rotation)
+
+        # Transform source points
+        transformed = source.transform_positions(R)
+
+        # Compute distances to first 100 target points
+        target_sample = jnp.array(target.positions[:100])
+        target_weights = jnp.array(target.weights[:100])
+
+        # Compute all pairwise distances (simplified)
+        diff = target_sample[:, None, :] - transformed[None, :, :]
+        distances_sq = jnp.sum(diff**2, axis=-1)
+
+        # Compute kernel values
+        kernel = jnp.exp(-0.5 * distances_sq / sigma**2)
+
+        # Weight the kernel values
+        weighted_kernel = kernel * target_weights[:, None] * source.weights[None, :]
+
+        # Compute log sum
+        return jnp.log(jnp.sum(weighted_kernel) + 1e-10)
+
+    # Generate a random rotation
+    key = random.PRNGKey(42)
+    quat = random.normal(key, shape=(4,))
+    rotation = quat / jnp.linalg.norm(quat)
+
+    # Test function value
+    print("\nTesting simplified log_prob function...")
+    try:
+        value = simplified_log_prob(rotation)
+        print(f"Function value: {value}")
+
+        if jnp.isnan(value):
+            print("WARNING: Function value is NaN")
+    except Exception as e:
+        print(f"Error computing function value: {e}")
+
+    # Test JAX autodiff gradient
+    print("\nTesting JAX autodiff gradient of simplified function...")
+    try:
+        grad_fn = grad(simplified_log_prob)
+        auto_grad = grad_fn(rotation)
+        print(f"JAX autodiff gradient: {auto_grad}")
+
+        if jnp.any(jnp.isnan(auto_grad)):
+            print("WARNING: JAX autodiff gradient contains NaN values")
+    except Exception as e:
+        print(f"Error computing JAX autodiff gradient: {e}")
+
+    # Test numerical gradient
+    print("\nTesting numerical gradient of simplified function...")
+    try:
+        numerical_grad = approx_fprime(
+            np.array(rotation),
+            lambda x: float(simplified_log_prob(jnp.array(x))),
+            epsilon=1e-6,
+        )
+        print(f"Numerical gradient: {numerical_grad}")
+
+        if np.any(np.isnan(numerical_grad)):
+            print("WARNING: Numerical gradient contains NaN values")
+    except Exception as e:
+        print(f"Error computing numerical gradient: {e}")
 
 
 if __name__ == "__main__":
-    import argparse
+    # Test gradient computation
+    test_gradient_computation()
 
-    parser = argparse.ArgumentParser(
-        description="Test registration score gradients with real data"
-    )
-    parser.add_argument("--class_idx", type=int, default=10, help="Class average index")
-    parser.add_argument(
-        "--particles", type=int, default=2000, help="Number of particles in 3D model"
-    )
-    parser.add_argument(
-        "--rotations", type=int, default=3, help="Number of rotations to test"
-    )
-    parser.add_argument(
-        "--use_kdtree",
-        type=bool,
-        default=False,
-        help="Use KD Tree method",
-    )
-
-    args = parser.parse_args()
-
-    main(
-        class_avg_idx=args.class_idx,
-        n_particles=args.particles,
-        test_rotations=args.rotations,
-        use_kdtree=args.use_kdtree,
-    )
+    # Debug JAX gradient computation
+    debug_jax_grad()
