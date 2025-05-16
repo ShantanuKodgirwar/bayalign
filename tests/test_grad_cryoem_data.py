@@ -13,13 +13,13 @@ import numpy as np
 from jax import grad, random
 from scipy.optimize import approx_fprime
 
-from bayalign.pointcloud import PointCloud, RotationProjection
-from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
-from examples.cryo_utils import (
+from bayalign.cryo_utils import (
     fit_model2d,
     load_class_average,
     pointcloud_from_class_avg,
 )
+from bayalign.pointcloud import PointCloud, RotationProjection
+from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
 
 # Enable double precision for better numerical stability
 jax.config.update("jax_enable_x64", True)
