@@ -46,7 +46,29 @@ def load_target_cloud(class_idx=10, n_particles=2000, return_fitted_target=False
         return target_cloud, sigma
 
 
-def load_cryo_data(class_idx=10, n_particles=2000):
+def load_synthetic_target_from_source(source_cloud):
+    # Project source with a random rotation to create target
+    key = random.PRNGKey(42)
+    quat = random.normal(key, shape=(4,))
+    rotation = quat / jnp.linalg.norm(quat)
+
+    # Add some noise to make it realistic
+    transformed_pos = source_cloud.transform_positions(rotation)
+
+    key, subkey = random.split(key)
+    noise = 0.1 * random.normal(subkey, shape=transformed_pos.shape)
+    noisy_pos = transformed_pos + noise
+
+    # Create target point cloud
+    target_cloud = PointCloud(noisy_pos, source_cloud.weights)
+
+    # Use a reasonable sigma value based on the data
+    sigma = 2.0
+
+    return target_cloud, sigma
+
+
+def load_cryo3D2D(class_idx=10, n_particles=2000, is_synthetic_target=False):
     """
     Load CryoEM data and prepare point clouds.
 
@@ -80,29 +102,56 @@ def load_cryo_data(class_idx=10, n_particles=2000):
     # For this minimal test, let's use a simple target cloud derived from the source
     # to avoid loading the full CryoEM dataset
 
-    # Project source with a random rotation to create target
-    key = random.PRNGKey(42)
-    quat = random.normal(key, shape=(4,))
-    rotation = quat / jnp.linalg.norm(quat)
-
     # Transform and project to 2D
-    transformed_pos = source_cloud.transform_positions(rotation)
-
-    if False:
-        # Add some noise to make it realistic
-        key, subkey = random.split(key)
-        noise = 0.1 * random.normal(subkey, shape=transformed_pos.shape)
-        noisy_pos = transformed_pos + noise
-
-        # Create target point cloud
-        target_cloud = PointCloud(noisy_pos, source_cloud.weights)
-
-        # Use a reasonable sigma value based on the data
-        sigma = 2.0
+    if is_synthetic_target:
+        target_cloud, sigma = load_synthetic_target_from_source(source_cloud)
     else:
         target_cloud, sigma = load_target_cloud(
             class_idx, n_particles, return_fitted_target=True
         )
+
+    print(f"Created source cloud with {source_cloud.size} points")
+    print(f"Created target cloud with {target_cloud.size} points")
+    print(f"Using sigma = {sigma}")
+
+    return target_cloud, source_cloud, sigma
+
+
+def load_cryo3D3D(n_particles=2000):
+    """
+    Load CryoEM 3D source and access a 3D target that is a rotated source.
+
+    Parameters
+    ----------
+    class_idx : int
+        Index of class average to use
+    n_particles : int
+        Number of particles in the model
+
+    Returns
+    -------
+    target_cloud : PointCloud
+        Target 3D point cloud
+    source_cloud : PointCloud
+        Source 3D point cloud
+    sigma : float
+        Estimated sigma value
+    """
+
+    # Load model data
+    model_path = f"data/ribosome_80S/model3d_{n_particles}.npz"
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    model_3d = np.load(model_path)
+    source_cloud = PointCloud(model_3d["positions"], model_3d["weights"])
+    source_cloud.positions -= source_cloud.center_of_mass
+
+    # For this minimal test, let's use a simple target cloud derived from the source
+    # to avoid loading the full CryoEM dataset
+
+    # create a target cloud
+    target_cloud, sigma = load_synthetic_target_from_source(source_cloud)
 
     print(f"Created source cloud with {source_cloud.size} points")
     print(f"Created target cloud with {target_cloud.size} points")
@@ -225,7 +274,7 @@ def compare_gradients(scorer, rotation, epsilon=1e-6):
     return results
 
 
-def test_gradient_computation():
+def test_gradient_computation(target, source, sigma):
     """
     Test gradient computation with CryoEM data.
     """
@@ -234,7 +283,6 @@ def test_gradient_computation():
     print("=" * 70)
 
     # Load CryoEM data
-    target, source, sigma = load_cryo_data()
 
     # Create scoring functions
     k = 20
@@ -368,16 +416,13 @@ def test_gradient_computation():
         print("\nSOME TESTS FAILED: Check detailed results")
 
 
-def debug_jax_grad():
+def debug_jax_grad(target, source, sigma):
     """
     Debug JAX gradient computation with a simplified function.
     """
     print("\n" + "=" * 50)
     print("DEBUGGING JAX GRADIENT COMPUTATION")
     print("=" * 50)
-
-    # Load CryoEM data
-    target, source, sigma = load_cryo_data()
 
     # Create a simplified version of the log_prob function
     def simplified_log_prob(rotation):
@@ -451,8 +496,27 @@ def debug_jax_grad():
 
 
 if __name__ == "__main__":
+    # load point cloud data
+    if False:
+        # uses a cryoEM projection image (fitted to a pointcloud) as 2D target
+        # and 3D model as source
+        target, source, sigma = load_cryo3D2D(
+            class_idx=10,
+            n_particles=2000,
+            is_synthetic_target=False,
+        )
+    else:
+        # loads a synthetic 3D target made from 3D source
+        target, source, sigma = load_cryo3D3D(
+            n_particles=2000,
+        )
+
     # Test gradient computation
-    test_gradient_computation()
+    test_gradient_computation(target, source, sigma)
 
     # Debug JAX gradient computation
-    debug_jax_grad()
+    debug_jax_grad(target, source, sigma)
+
+    print("\n" + "=" * 50)
+    print("END OF TESTS")
+    print("=" * 50)
