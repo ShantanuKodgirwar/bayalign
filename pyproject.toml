@@ -29,6 +29,7 @@ examples = [
     "scikit-image>=0.25.2",
     "seaborn>=0.13.2",
     "nbformat>=5.10.4",
+    "h5py>=3.13.0",
 ]
 dev = [
     "ruff>=0.11.8",

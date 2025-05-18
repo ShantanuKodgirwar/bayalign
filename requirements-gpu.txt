@@ -37,7 +37,9 @@ fonttools==4.57.0
 h5netcdf==1.6.1
     # via arviz
 h5py==3.13.0
-    # via h5netcdf
+    # via
+    #   bayalign
+    #   h5netcdf
 imageio==2.37.0
     # via scikit-image
 ipykernel==6.29.5
