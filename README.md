@@ -1,7 +1,32 @@
 # bayalign
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 
-A work-in-progress JAX-based library for efficient Bayesian inference using geodesic slice sampling on the sphere (GeoSSS), designed for rigid registration via Gaussian mixture models (GMM). It is demonstrated on a cryo-EM sub-problem involving estimation of the 3D model's rotation that best aligns with observed 2D projections. 
+🛠️ *work-in-progress* 🛠️
+
+A light-weight JAX-based package for efficient Bayesian inference in rigid point cloud registration using Gaussian mixture modeling. The method is demonstrated on a cryo-EM sub-problem involving the estimation of the 3D structure’s rotation that best aligns with observed 2D projections. 
+
+## Features
+- Supports rigid registration between 3D-3D and 3D-2D point clouds.
+- Uses kernel correlation or Gaussian mixtures to score candidate poses.
+- Enables efficient bayesian inference on the rotation group via geodesic slice sampling on the sphere (GeoSSS), with additional support for HMC and RWMH 
+
+## Installation
+
+```bash
+pip install git+https://github.com/ShantanuKodgirwar/bayalign.git
+```
+
+## Usage
+
+```python
+from bayalign.pointcloud import PointCloud, RotationProjection
+from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
+
+# TODO: Add a minimal example to demonstrate the two ways (or atleast one)
+# 3D-3D
+
+# 3D-2D
+```
 
 ## Development
 

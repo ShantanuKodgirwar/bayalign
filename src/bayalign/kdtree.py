@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Authors: Benjamin Dodge
+# Refer here: https://github.com/dodgebc/jaxkd
+
 from collections import namedtuple
 
 import jax
