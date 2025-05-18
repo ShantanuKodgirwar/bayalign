@@ -13,13 +13,13 @@ import numpy as np
 from jax import grad, random
 from scipy.optimize import approx_fprime
 
-from bayalign.cryo_utils import (
+from bayalign.pointcloud import PointCloud, RotationProjection
+from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
+from examples.cryo_utils import (
     fit_model2d,
     load_class_average,
     pointcloud_from_class_avg,
 )
-from bayalign.pointcloud import PointCloud, RotationProjection
-from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
 
 # Enable double precision for better numerical stability
 jax.config.update("jax_enable_x64", True)
@@ -139,7 +139,7 @@ def load_cryo3D3D(n_particles=2000):
     """
 
     # Load model data
-    model_path = f"data/ribosome_80S/model3d_{n_particles}.npz"
+    model_path = f"examples/data/ribosome_80S/model3d_{n_particles}.npz"
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
