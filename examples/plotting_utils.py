@@ -29,7 +29,7 @@ def show_3d_pointcloud(
     Parameters
     ----------
     positions : array-like
-        A 2D array of shape (n, 3) where each column represents the
+        A 2D array or list of shape (n, 3) where each row represents the
         (x, y, z) coordinates of a point in the point cloud.
     pc_size : int, optional
         The size of the points in the point cloud visualization, by default 3.
@@ -48,11 +48,6 @@ def show_3d_pointcloud(
     None
         This function does not return any value. It directly displays the
         3D scatter plot using Plotly.
-
-    Raises
-    ------
-    ImportError
-        If required optional dependencies (plotly, pandas, scipy) are not installed.
     """
 
     # Convert positions to a Pandas DataFrame

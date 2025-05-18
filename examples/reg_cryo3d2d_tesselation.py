@@ -142,7 +142,7 @@ if __name__ == "__main__":
     )
 
     # no of points/ RBF kernels for source
-    n_particles = 2000
+    n_particles = 1000
 
     # load 3d model
     model = np.load(f"examples/data/ribosome_80S/model3d_{n_particles}.npz")
@@ -167,6 +167,7 @@ if __name__ == "__main__":
             sigma_truth,
             k=k_neighbours,
             beta=20.0,
+            use_kdtree=False,
         )
     elif scoring_metric == "MSG":  # "MSG"
         prob = MixtureSphericalGaussians(
@@ -174,13 +175,13 @@ if __name__ == "__main__":
             source,
             sigma_truth,
             k=k_neighbours,
-            beta=1.0,
+            use_kdtree=False,
         )
     else:
         raise ValueError(f"Unknown scoring metric: {scoring_metric}")
 
     # Parameters for processing
-    load_precomputed = True
+    load_precomputed = False
     savefig = True
 
     # Run the selected scoring method
