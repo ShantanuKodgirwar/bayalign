@@ -37,7 +37,7 @@ git clone https://github.com/ShantanuKodgirwar/bayalign.git
 cd bayalign
 ```
 
-### Installation with pip (legacy workflow)
+### Via pip (legacy workflow)
 
 If you don't want to use uv (if you do, see below!), and simply rely on pip:
 
@@ -47,10 +47,7 @@ pip install -r requirements-cpu.txt # or via `requirements-gpu.txt`
 pip install -e . --no-deps
 ```
 
-> [!NOTE]  
-> Feel free to choose the type of your environment (venv/conda) when using pip.
-
-### Installation with uv (recommended!)
+### Via uv (recommended!)
 
 The package is maintained with the fast package manager [uv](https://github.com/astral-sh/uv). The package `bayalign` and its *locked* dependencies can be installed in a dedicated virtual environment (only supports venv) with the single command:
 
