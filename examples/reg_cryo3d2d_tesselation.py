@@ -13,15 +13,15 @@ import jax.numpy as jnp
 import matplotlib.pylab as plt
 import numpy as np
 
-from bayalign.cryo_utils import (
-    fit_model2d,
-    load_class_average,
-    pointcloud_from_class_avg,
-)
 from bayalign.pointcloud import RotationProjection
 from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
 from bayalign.sphere_tesselation import tessellate_rotations
 from bayalign.utils import take_time
+from examples.cryo_utils import (
+    fit_model2d,
+    load_class_average,
+    pointcloud_from_class_avg,
+)
 
 
 def run_scoring_method(
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     n_particles = 2000
 
     # load 3d model
-    model = np.load(f"data/ribosome_80S/model3d_{n_particles}.npz")
+    model = np.load(f"examples/data/ribosome_80S/model3d_{n_particles}.npz")
 
     # instance of the 3D point cloud source with a correction of center of mass
     source = RotationProjection(model["positions"], model["weights"]).centered_copy()

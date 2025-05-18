@@ -2,8 +2,6 @@
 GMM/RBF with equal weights and shared sigma representation of the given 3D model, which
 is rotated and projected and then converted to 2D model image. A direct score should compare
 this to the random cryo-EM image.
-
-*Original code was in torch given by Julian, converted to jax.*
 """
 
 import math
@@ -80,7 +78,7 @@ class GMM:
 
     def images(self, rotations, scalar=1):
         """
-        Generate 2D projection images from 3D points.
+        Generate 2D projection model images from 3D points.
 
         Parameters:
         - rotations: Array of shape (B, 3, 3), batch of rotation matrices.
@@ -168,7 +166,6 @@ class GMM:
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    import numpy as np
     from scipy.spatial.transform import Rotation as R
 
     # Initialize random number generator with a seed for reproducibility

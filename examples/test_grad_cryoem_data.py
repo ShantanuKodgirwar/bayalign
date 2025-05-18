@@ -2,8 +2,7 @@
 Minimal test script to isolate JAX autodiff gradient issues with CryoEM data.
 """
 
-# TODO: With real data, there are some underflow, overflow issues especially with MixtureSphericalGaussians, need to fix it first.
-
+# %%
 import os
 from time import time
 

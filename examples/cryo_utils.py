@@ -11,7 +11,9 @@ from skimage import measure
 from bayalign.pointcloud import PointCloud
 
 
-def load_class_average(index=0, data_path="data/ribosome_80S/pfrib80S_cavgs.mrc"):
+def load_class_average(
+    index=0, data_path="examples/data/ribosome_80S/pfrib80S_cavgs.mrc"
+):
     """Loads a projection image (class average) of the 80S ribosome.
 
     Parameters

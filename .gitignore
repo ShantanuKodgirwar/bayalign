@@ -13,4 +13,5 @@ wheels/
 .ropeproject
 
 # Data directory
-data
+data/*
+results
