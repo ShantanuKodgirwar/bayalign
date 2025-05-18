@@ -6,6 +6,10 @@ arviz==0.21.0
     # via bayalign
 asttokens==3.0.0
     # via stack-data
+attrs==25.3.0
+    # via
+    #   jsonschema
+    #   referencing
 cffi==1.17.1 ; implementation_name == 'pypy'
     # via pyzmq
 colorama==0.4.6 ; sys_platform == 'win32'
@@ -26,6 +30,8 @@ exceptiongroup==1.2.2 ; python_full_version < '3.11'
     # via ipython
 executing==2.2.0
     # via stack-data
+fastjsonschema==2.21.1
+    # via nbformat
 fonttools==4.57.0
     # via matplotlib
 h5netcdf==1.6.1
@@ -50,12 +56,17 @@ jedi==0.19.2
     # via ipython
 joblib==1.5.0
     # via bayalign
+jsonschema==4.23.0
+    # via nbformat
+jsonschema-specifications==2025.4.1
+    # via jsonschema
 jupyter-client==8.6.3
     # via ipykernel
 jupyter-core==5.7.2
     # via
     #   ipykernel
     #   jupyter-client
+    #   nbformat
 kiwisolver==1.4.8
     # via matplotlib
 lazy-loader==0.4
@@ -78,6 +89,8 @@ mrcfile==1.5.4
     # via bayalign
 narwhals==1.39.0
     # via plotly
+nbformat==5.10.4
+    # via bayalign
 nest-asyncio==1.6.0
     # via ipykernel
 networkx==3.4.2
@@ -161,6 +174,14 @@ pyzmq==26.4.0
     # via
     #   ipykernel
     #   jupyter-client
+referencing==0.36.2
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
+rpds-py==0.25.0
+    # via
+    #   jsonschema
+    #   referencing
 ruff==0.11.8
     # via bayalign
 scikit-image==0.25.2
@@ -195,10 +216,12 @@ traitlets==5.14.3
     #   jupyter-client
     #   jupyter-core
     #   matplotlib-inline
+    #   nbformat
 typing-extensions==4.13.2
     # via
     #   arviz
     #   ipython
+    #   referencing
 tzdata==2025.2
     # via pandas
 wcwidth==0.2.13
