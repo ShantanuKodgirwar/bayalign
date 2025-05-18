@@ -28,7 +28,7 @@ jax.config.update("jax_enable_x64", True)
 def load_target_cloud(class_idx=10, n_particles=2000, return_fitted_target=False):
     # convert a class average to a point cloud
     image = load_class_average(class_idx)
-    target_cloud, _ = pointcloud_from_class_avg(image)
+    target_cloud = pointcloud_from_class_avg(image)
 
     # find a 2D fit of this target and estimate an optimal sigma
     target_fit2d, sigma = fit_model2d(
@@ -144,8 +144,10 @@ def load_cryo3D3D(n_particles=2000):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
     model_3d = np.load(model_path)
-    source_cloud = PointCloud(model_3d["positions"], model_3d["weights"])
-    source_cloud.positions -= source_cloud.center_of_mass
+    source_cloud = PointCloud(
+        model_3d["positions"], model_3d["weights"]
+    ).centered_copy()
+    # source_cloud.positions -= source_cloud.center_of_mass
 
     # For this minimal test, let's use a simple target cloud derived from the source
     # to avoid loading the full CryoEM dataset
@@ -290,13 +292,11 @@ def test_gradient_computation(target, source, sigma):
 
     # Create KernelCorrelation with brute force
     print("\nCreating KernelCorrelation scorer...")
-    kc = KernelCorrelation(target, source, sigma, k=k, beta=beta, use_kdtree=False)
+    kc = KernelCorrelation(target, source, sigma, k=k, beta=beta)
 
     # Create MixtureSphericalGaussians with brute force
     print("\nCreating MixtureSphericalGaussians scorer...")
-    msg = MixtureSphericalGaussians(
-        target, source, sigma, k=k, beta=beta, use_kdtree=False
-    )
+    msg = MixtureSphericalGaussians(target, source, sigma, k=k, beta=beta)
 
     # Generate random test rotations
     print("\nGenerating test rotations...")

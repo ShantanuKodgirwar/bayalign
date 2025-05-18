@@ -103,7 +103,7 @@ def test_gradient_flow():
 
     # Test KernelCorrelation with brute force in 3D-3D scenario
     print("\n1. Testing KernelCorrelation (3D-3D) with brute force...")
-    kc_3d = KernelCorrelation(target_3d, source_3d, sigma=0.5, k=10, use_kdtree=False)
+    kc_3d = KernelCorrelation(target_3d, source_3d, sigma=0.5, k=10)
 
     log_prob_3d = kc_3d.log_prob(test_rotation)
     print(f"  Log probability: {log_prob_3d}")
@@ -135,9 +135,7 @@ def test_gradient_flow():
 
     # Test MixtureSphericalGaussians with brute force in 3D-2D scenario
     print("\n2. Testing MixtureSphericalGaussians (3D-2D) with brute force...")
-    msg_3d2d = MixtureSphericalGaussians(
-        target_2d, projection_source, sigma=0.5, k=10, use_kdtree=False
-    )
+    msg_3d2d = MixtureSphericalGaussians(target_2d, projection_source, sigma=0.5, k=10)
 
     log_prob_3d2d = msg_3d2d.log_prob(test_rotation)
     print(f"  Log probability: {log_prob_3d2d}")
