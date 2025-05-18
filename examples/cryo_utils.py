@@ -1,3 +1,4 @@
+# Utility functions for cryo-EM data
 import os
 
 import mrcfile
@@ -84,16 +85,19 @@ def pointcloud_from_class_avg(image, pixelsize=2.68, threshold_method="mean"):
     positions = np.transpose(np.nonzero(mask)) * pixelsize
     weights = image[mask] - threshold
 
-    # Create point cloud
-    target = PointCloud(positions, weights)
+    # Create point cloud (and shift to the center)
+    target = PointCloud(positions, weights).centered_copy()
 
-    # Shift point cloud's center such that the center of mass is at (0, 0)
-    target.transformed(np.eye(2), -target.center_of_mass)
-
-    return target, mask
+    return target
 
 
-def fit_model2d(target, K, n_iter=1000, k=100, verbose=False):
+def fit_model2d(
+    target: PointCloud,
+    K: int,
+    n_iter: int = 1000,
+    k: int = 100,
+    verbose: bool = False,
+):
     """
     Fits a 2D model (mixture of gaussians) with fixed number of points (RBF kernels) K to weighted 2D point cloud using
     Expectation-Maximization (EM) algorithm. This returns a fixed bandwidth `sigma`.
@@ -158,4 +162,6 @@ def fit_model2d(target, K, n_iter=1000, k=100, verbose=False):
         if verbose and (i + 1) % (n_iter // 10) == 0:
             print(f"EM iteration {i + 1}/{n_iter}, sigma={sigma:.4f}")
 
-    return x, sigma
+    # convert fitted point cloud to PointCloud class
+    pc_fit2d = PointCloud(x, weights=None)
+    return pc_fit2d, sigma

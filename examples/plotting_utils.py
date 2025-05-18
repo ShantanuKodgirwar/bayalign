@@ -7,43 +7,12 @@ import logging
 import os
 from typing import Dict, List
 
+import corner
+import matplotlib.pyplot as plt
 import numpy as np
-
-# Optional dependencies with proper try-except blocks
-try:
-    import pandas as pd
-
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
-
-try:
-    import plotly.express as px
-
-    PLOTLY_AVAILABLE = True
-except ImportError:
-    PLOTLY_AVAILABLE = False
-
-try:
-    from scipy.spatial import KDTree
-
-    SCIPY_AVAILABLE = True
-except ImportError:
-    SCIPY_AVAILABLE = False
-
-try:
-    import matplotlib.pyplot as plt
-
-    MPL_AVAILABLE = True
-except ImportError:
-    MPL_AVAILABLE = False
-
-try:
-    import corner
-
-    CORNER_AVAILABLE = True
-except ImportError:
-    CORNER_AVAILABLE = False
+import pandas as pd
+import plotly.express as px
+from scipy.spatial import KDTree
 
 
 def show_3d_pointcloud(
@@ -85,27 +54,6 @@ def show_3d_pointcloud(
     ImportError
         If required optional dependencies (plotly, pandas, scipy) are not installed.
     """
-    # Check for required dependencies
-    if not PLOTLY_AVAILABLE:
-        raise ImportError(
-            "Plotly is required for point cloud visualization but not installed. "
-            "Install visualization dependencies with 'pip install bayalign[viz]' "
-            "or 'uv sync --optional-group viz'"
-        )
-
-    if not PANDAS_AVAILABLE:
-        raise ImportError(
-            "Pandas is required for point cloud visualization but not installed. "
-            "Install visualization dependencies with 'pip install bayalign[viz]' "
-            "or 'uv sync --optional-group viz'"
-        )
-
-    if color_by_neighbours and not SCIPY_AVAILABLE:
-        raise ImportError(
-            "SciPy is required for neighbor-based coloring but not installed. "
-            "Install visualization dependencies with 'pip install bayalign[viz]' "
-            "or 'uv sync --optional-group viz'"
-        )
 
     # Convert positions to a Pandas DataFrame
     df = pd.DataFrame(positions, columns=["x", "y", "z"])
@@ -205,19 +153,6 @@ def scatter_matrix(
         If required optional dependencies (matplotlib, corner) are not installed.
     """
     # Check for required dependencies
-    if not MPL_AVAILABLE:
-        raise ImportError(
-            "Matplotlib is required for scatter matrix plots but not installed. "
-            "Install visualization dependencies with 'pip install bayalign[viz]'"
-            "or 'uv sync --optional-group viz'"
-        )
-
-    if not CORNER_AVAILABLE:
-        raise ImportError(
-            "Corner is required for scatter matrix plots but not installed. "
-            "Install visualization dependencies with 'pip install bayalign[viz]'"
-            "or 'uv sync --optional-group viz'"
-        )
 
     # Define font sizes
     label_size = 32  # Size for axis labels
