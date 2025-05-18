@@ -16,9 +16,6 @@ NOTE: Currently we are only interested in sampling rotations and ignore translat
 is set everywhere. If needed, we could add support for translations in the future.
 """
 
-# TODO: Note that this implementation still has implementation issues, such as `kd_tree_nn`
-# via `jax.pure_callback` causes issues with grad flow. I assumed `jax.lax.stop_gradient`.
-# test implementation via `examples/test_grad_cryoem_data.py` and `examples/test_grad_synthetic_data.py`
 import warnings
 from dataclasses import dataclass
 from functools import partial
@@ -28,7 +25,6 @@ import jax.numpy as jnp
 import numpy as np
 from jax import grad, jit
 from jax.scipy.special import logsumexp
-from scipy.spatial import KDTree
 
 # Import from your pointcloud module
 from .pointcloud import PointCloud
@@ -38,83 +34,52 @@ from .utils import matrix2quat, quat2matrix
 int_type = np.int32
 
 
-@partial(jit, static_argnames=("k", "pc_threshold"))
-def find_nearest_k_indices(
-    y: jnp.ndarray,  # (L, dim)
-    x: jnp.ndarray,  # (K, dim)
-    k: int,
-    pc_threshold: int = 5000,
-) -> jnp.ndarray:
+# TODO: Currently a brute-force KNN implementation (O(N^2))is used as it is pure JAX, however, better methods could be explored later.
+@partial(jit, static_argnames=("k",))
+def knn_search(target_points, source_points, k):
     """
-    Find the indices of the k nearest neighbors from x for each point in y.
-    Only returns indices, not distances.
+    Efficient JAX-compatible K-nearest neighbors search.
+
+    Parameters
+    ----------
+    target_points : jnp.ndarray
+        Query points, shape (M, D)
+    source_points : jnp.ndarray
+        Reference points, shape (N, D)
+    k : int
+        Number of nearest neighbors to find
+        Assumed to be a static value for JIT compilation
+
+    Returns
+    -------
+    jnp.ndarray
+        Indices of nearest neighbors, shape (M, k)
     """
-    # Adjust k to avoid out-of-bounds errors
-    k = min(k, x.shape[0])
+    # Compute squared Euclidean distances
+    target_norm2 = jnp.sum(target_points**2, axis=1, keepdims=True)
+    source_norm2 = jnp.sum(source_points**2, axis=1)
+    dots = jnp.dot(target_points, source_points.T)
+    dists2 = target_norm2 - 2 * dots + source_norm2
 
-    # All pair-wise squared distances (L, K)
-    d2 = jnp.sum((y[:, None, :] - x[None, :, :]) ** 2, axis=-1)
+    # Ensure distances are non-negative
+    dists2 = jnp.maximum(dists2, 0.0)
 
-    # Get indices of k smallest distances (use negative for top_k)
-    _, idx = jax.lax.top_k(-d2, k)
+    # Find k smallest distances - k is assumed to be a static argument
+    _, indices = jax.lax.top_k(-dists2, k=k)
 
-    if y.shape[0] > pc_threshold or x.shape[0] > pc_threshold:
-        warnings.warn("Large input size may impact performance")
+    # Clip indices to valid range in case k > n_source
+    n_source = source_points.shape[0]
+    indices = jnp.clip(indices, 0, n_source - 1)
 
-    return idx
-
-
-def kd_tree_nn(points: jax.Array, test_points: jax.Array, k: int = 1) -> jax.Array:
-    """
-    Uses a KD-tree to find the k nearest neighbors to a test point. Implementation
-    adapted from https://github.com/jax-ml/jax/discussions/9813#discussioncomment-11513589
-
-    Parameters:
-        points: [n, d] Array of points.
-        test_points: [m, d] points to query
-        k: The number of nearest neighbors to find.
-
-    Returns:
-        distances: [m, k] Squared distances to the k nearest neighbors.
-        indices: [m, k] Indices of the k nearest neighbors.
-    """
-    m, d = np.shape(test_points)
-    k = int(k)
-    args = (points, test_points, k)
-
-    index_shape_dtype = jax.ShapeDtypeStruct(shape=(m, k), dtype=int_type)
-
-    return jax.pure_callback(_kd_tree_idx_host, index_shape_dtype, *args)
-
-
-def _kd_tree_idx_host(points: jax.Array, test_points: jax.Array, k: int) -> np.ndarray:
-    """
-    Host function that builds and queries the KD-tree.
-    """
-    points, test_points = jax.tree.map(np.asarray, (points, test_points))
-    k = int(k)
-    tree = KDTree(points, compact_nodes=False, balanced_tree=False)
-    if k == 1:
-        _, indices = tree.query(test_points, k=[1])
-        indices = indices.reshape(-1, 1)
-    else:
-        _, indices = tree.query(test_points, k=k)
-
-    # Return squared distances for consistency with the rest of the code
-    return indices.astype(int_type)
+    return indices
 
 
 # ---------------------------------------------------------------------- #
-#  Abstract `Registration` class                                         #
+#  Kernel correlation                                                    #
 # ---------------------------------------------------------------------- #
 class Registration:
     """
     Rigid registration scoring assigning a log-probability to a rigid body pose.
-    Concrete subclasses implement the *SO(3)-level* score mainly via Kernel Correlation
-    and Log Mixture of Gaussians.
-
-    All methods accept either a rotation matrix or a unit quaternion, and gradients
-    are always computed with respect to quaternion parameters using JAX autodiff.
     """
 
     beta: float = 1.0  # per-metric inverse temperature
@@ -131,164 +96,271 @@ class Registration:
         """Convert quaternion to rotation matrix if needed."""
         return quat2matrix(rotation) if self._is_quaternion(rotation) else rotation
 
-    # public API ----------------------------------------------------------
+    # public API
     def log_prob(self, rotation, translation=None):
-        """
-        Compute log probability for a given rotation (matrix or quaternion).
-        """
-        # Internally, use quaternion for consistency with gradient calculation
+        """Compute log probability for a given rotation."""
         q = self._ensure_quaternion(rotation)
         return self.beta * self._log_prob_impl(q, translation)
 
     def gradient(self, rotation, translation=None):
-        """
-        Compute gradient of log probability with respect to quaternion parameters
-        using JAX autodiff.
-        """
+        """Compute gradient with respect to quaternion parameters."""
         q = self._ensure_quaternion(rotation)
-        # Use JAX's autodiff to compute gradient with respect to quaternion
-        return self.beta * grad(lambda q: self._log_prob_impl(q, translation))(q)
+        grad_q = grad(lambda q: self._log_prob_impl(q, translation))(q)
+        return self.beta * grad_q
 
     def _log_prob_impl(self, q, translation=None):
-        """
-        Implementation of log probability calculation that subclasses must override.
-        This should accept a quaternion (for gradient consistency) but may
-        convert to matrix internally if needed.
-        """
+        """Implementation of log probability calculation."""
         raise NotImplementedError("Subclasses must implement _log_prob_impl")
 
 
-# ---------------------------------------------------------------------- #
-#  Kernel correlation                                                    #
-# ---------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class KernelCorrelation(Registration):
+    """
+    Kernel Correlation scoring method for rigid registration between point clouds.
+
+    This class implements the Kernel Correlation (KC) scoring method, which assigns a
+    log-probability score to a rigid body transformation between two point clouds.
+    The score is based on the sum of Gaussian kernels between the target points
+    and their k-nearest neighbors in the transformed source point cloud.
+
+    The KC score is defined as:
+    log p(R) = log sum_{i,j} w_i v_j exp(-||y_i - PRx_j||^2 / (2σ^2))
+
+    where:
+    - y_i are the target points with weights w_i
+    - x_j are the source points with weights v_j
+    - R is the rotation matrix
+    - P is the optional projection for 3D->2D
+    - σ is the kernel bandwidth parameter
+
+    Parameters
+    ----------
+    target : PointCloud
+        Target point cloud
+    source : PointCloud
+        Source point cloud to be transformed
+    sigma : float, default=1.0
+        Bandwidth parameter controlling the width of Gaussian kernels
+    beta : float, default=1.0
+        Inverse temperature parameter that scales the log probability
+    k : int, default=20
+        Number of nearest neighbors to consider for each target point
+
+    Notes
+    -----
+    The implementation is JAX-compatible and supports automatic differentiation
+    for gradient computation, which is essential for optimization and sampling.
+    """
+
     target: PointCloud
     source: PointCloud
     sigma: float = 1.0
     beta: float = 1.0
     k: int = 20
-    use_kdtree: bool = True
-    pc_threshold: int = 5000
 
     def __post_init__(self):
-        sig = float(self.sigma)
+        """
+        Initialize parameters after instance creation.
+
+        Validates inputs, converts parameters to the correct types,
+        and issues warnings for potential numerical issues.
+        """
+        sigma = float(self.sigma)
         k = int(self.k)
-        use_tree = bool(self.use_kdtree)
-        threshold = int(self.pc_threshold)
 
         # Check for numerical stability with small sigma values
-        if sig < 1e-6:
-            warnings.warn(f"Small sigma value ({sig}) may cause numerical instability")
-
-        # Store static arrays
-        tgt_pos = self.target.positions
-        tgt_w = self.target.weights
-        src_w = self.source.weights
-
-        @partial(jit, static_argnames=("k", "threshold"))
-        def _log_prob_impl(q, translation=None, k=k, threshold=threshold):
-            """Log probability implementation with separated discrete and continuous operations."""
-            # Convert quaternion to rotation matrix
-            R = quat2matrix(q)
-
-            # Transform the source points using the rotation matrix
-            src_pos_transformed = self.source.transform_positions(R, translation)
-
-            # Non-differentiable part: Find nearest neighbors for each target point
-            if use_tree:
-                idx = kd_tree_nn(src_pos_transformed, tgt_pos, k)
-            else:
-                idx = find_nearest_k_indices(tgt_pos, src_pos_transformed, k, threshold)
-
-            # Stop gradient through the indices
-            idx = jax.lax.stop_gradient(idx)
-
-            # Differentiable part: Re-compute distances for gradient flow
-            # Get the selected source points
-            src_selected = jnp.take(src_pos_transformed, idx, axis=0)
-
-            # Compute squared distances
-            d2 = jnp.sum((tgt_pos[:, None, :] - src_selected) ** 2, axis=-1)
-
-            # For kernel correlation, we compute the Gaussian kernel (L, k)
-            log_kernel_values = (
-                -0.5 * d2 / sig**2
-                + jnp.log(jnp.take(src_w, idx))
-                + +jnp.log(tgt_w[:, None])
+        if sigma < 1e-6:
+            warnings.warn(
+                f"Small sigma value ({sigma}) may cause numerical instability"
             )
 
-            # return log probability (negative cost) scaled by beta
-            return logsumexp(log_kernel_values, axis=None)
+        # Store parameters
+        object.__setattr__(self, "_sigma", sigma)
+        object.__setattr__(self, "_k", k)
 
-        # Store the implementation
-        object.__setattr__(self, "_log_prob_impl", _log_prob_impl)
+    def _log_prob_impl(self, q, translation=None):
+        """
+        Implementation of log probability calculation for Kernel Correlation.
+
+        Computes the log probability of a given rotation (represented as a quaternion)
+        and optional translation by:
+        1. Transforming the source points
+        2. Finding k-nearest neighbors for each target point
+        3. Computing Gaussian kernel values
+        4. Summing the weighted kernel values in log-space
+
+        Parameters
+        ----------
+        q : jnp.ndarray
+            Quaternion representing rotation with shape (4,)
+        translation : jnp.ndarray, optional
+            Translation vector, by default None
+
+        Returns
+        -------
+        float
+            Log probability score for the given transformation
+
+        Notes
+        -----
+        This implementation is fully JAX-compatible to support auto-differentiation
+        and uses optimized KNN search for efficiency.
+        """
+        # Convert quaternion to rotation matrix
+        R = quat2matrix(q)
+
+        # Transform source points
+        src_pos_transformed = self.source.transform_positions(R, translation)
+
+        # Extract target arrays
+        target_pos = self.target.positions
+        target_weights = self.target.weights
+        source_weights = self.source.weights
+
+        # Efficient nearest neighbors search
+        idx = knn_search(target_pos, src_pos_transformed, self._k)
+
+        # Gather selected points and weights
+        selected_points = jnp.take(src_pos_transformed, idx, axis=0)
+        selected_weights = jnp.take(source_weights, idx, axis=0)
+
+        # Compute squared distances
+        d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
+
+        # Compute the Gaussian kernel
+        log_kernel_values = (
+            -0.5 * d2 / (self._sigma**2)
+            + jnp.log(selected_weights)
+            + jnp.log(target_weights[:, None])
+        )
+
+        # Return log probability (logsumexp for numerical stability)
+        return logsumexp(log_kernel_values, axis=None)
 
 
-# ---------------------------------------------------------------------- #
-#  Mixture of spherical Gaussians (soft-ICP)                             #
-# ---------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class MixtureSphericalGaussians(Registration):
+    """
+    Mixture of Spherical Gaussians (MSG) scoring method for rigid registration.
+
+    This class implements the Mixture of Spherical Gaussians scoring method, which
+    assigns a log-probability score to a rigid body transformation between point clouds.
+    It models each transformed source point as the center of a Gaussian distribution
+    and computes the likelihood of target points under this mixture model.
+
+    The MSG score is defined as:
+    log p(R) = sum_i w_i log sum_j v_j N(y_i | PRx_j, σ^2I)
+
+    where:
+    - y_i are the target points with weights w_i
+    - x_j are the source points with weights v_j
+    - R is the rotation matrix
+    - P is the optional projection for 3D->2D
+    - N(y | μ, σ^2I) is a Gaussian with mean μ and covariance σ^2I
+
+    Parameters
+    ----------
+    target : PointCloud
+        Target point cloud
+    source : PointCloud
+        Source point cloud to be transformed
+    sigma : float, default=1.0
+        Standard deviation of the spherical Gaussians
+    beta : float, default=1.0
+        Inverse temperature parameter that scales the log probability
+    k : int, default=20
+        Number of nearest neighbors to use for efficient computation
+
+    Notes
+    -----
+    This implementation differs from Kernel Correlation in how the scores are computed.
+    MSG computes a weighted sum of log probabilities, while KC computes a log of weighted
+    sum of kernel values. MSG tends to be more robust to differences in point densities.
+    """
+
     target: PointCloud
-    source: PointCloud  # Can be PointCloud or RotationProjection
+    source: PointCloud
     sigma: float = 1.0
     beta: float = 1.0
     k: int = 20
-    use_kdtree: bool = True
-    pc_threshold: int = 5000  # Threshold for warning about large point clouds
-    """
-    Log-likelihood of points under a transformed Gaussian mixture.
-    Works for 3D-3D, 3D-2D, or 2D-2D transformations.
-    """
 
     def __post_init__(self):
-        sig = float(self.sigma)
+        """
+        Initialize parameters after instance creation.
+
+        Validates inputs, converts parameters to the correct types,
+        and issues warnings for potential numerical issues.
+        """
+        sigma = float(self.sigma)
         k = int(self.k)
-        use_tree = bool(self.use_kdtree)
-        threshold = int(self.pc_threshold)
 
         # Check for numerical stability with small sigma values
-        if sig < 1e-6:
-            warnings.warn(f"Small sigma value ({sig}) may cause numerical instability")
+        if sigma < 1e-6:
+            warnings.warn(
+                f"Small sigma value ({sigma}) may cause numerical instability"
+            )
 
-        # Store static arrays
-        tgt_pos = self.target.positions
-        tgt_w = self.target.weights
-        src_w = self.source.weights
+        # Store parameters
+        object.__setattr__(self, "_sigma", sigma)
+        object.__setattr__(self, "_k", k)
 
-        @partial(jit, static_argnames=("k", "threshold"))
-        def _log_prob_impl(q, translation=None, k=k, threshold=threshold):
-            """Log probability implementation using either KD-tree or brute force."""
-            # Convert quaternion to rotation matrix for use with transform_positions
-            R = quat2matrix(q)
+    def _log_prob_impl(self, q, translation=None):
+        """
+        Implementation of log probability calculation for Mixture of Spherical Gaussians.
 
-            # Transform the source points using the rotation matrix
-            src_pos_transformed = self.source.transform_positions(R, translation)
+        Computes the log probability of a given rotation (represented as a quaternion)
+        and optional translation by:
+        1. Transforming the source points
+        2. Finding k-nearest neighbors for each target point
+        3. Computing Gaussian likelihoods
+        4. Computing weighted log probabilities for each target point
 
-            # Non-differentiable part: Find nearest neighbors for each target point
-            if use_tree:
-                idx = kd_tree_nn(src_pos_transformed, tgt_pos, k)
-            else:
-                idx = find_nearest_k_indices(tgt_pos, src_pos_transformed, k, threshold)
+        Parameters
+        ----------
+        q : jnp.ndarray
+            Quaternion representing rotation with shape (4,)
+        translation : jnp.ndarray, optional
+            Translation vector, by default None
 
-            # Stop gradient through the indices
-            idx = jax.lax.stop_gradient(idx)
+        Returns
+        -------
+        float
+            Log probability score for the given transformation
 
-            # Differentiable part: Recompute distances for gradient flow
-            src_selected = jnp.take(src_pos_transformed, idx, axis=0)
-            d2 = jnp.sum((tgt_pos[:, None, :] - src_selected) ** 2, axis=-1)
+        Notes
+        -----
+        The nearest neighbors approach is used for efficiency, as computing the
+        full mixture model would require evaluating all pairs of points, which
+        would be computationally prohibitive for large point clouds.
+        """
+        # Convert quaternion to rotation matrix
+        R = quat2matrix(q)
 
-            # Compute log probability directly without intermediate exp() calculation
-            # This avoids potential underflow/overflow in the exponential
-            log_phi = -0.5 * d2 / sig**2
-            log_w_k = jnp.log(jnp.take(src_w, idx))
-            log_norm = jnp.log(2 * jnp.pi * sig**2)
+        # Transform source points
+        src_pos_transformed = self.source.transform_positions(R, translation)
 
-            # Use logsumexp for numerical stability
-            ll = logsumexp(log_w_k + log_phi - log_norm, axis=1)
+        # Extract target arrays
+        target_pos = self.target.positions
+        target_weights = self.target.weights
+        source_weights = self.source.weights
 
-            return jnp.sum(ll * tgt_w)
+        # Efficient nearest neighbors search
+        idx = knn_search(target_pos, src_pos_transformed, self._k)
 
-        # Store the implementation
-        object.__setattr__(self, "_log_prob_impl", _log_prob_impl)
+        # Gather selected points and weights
+        selected_points = jnp.take(src_pos_transformed, idx, axis=0)
+        selected_weights = jnp.take(source_weights, idx, axis=0)
+
+        # Compute squared distances
+        d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
+
+        # Compute probability in log-space for numerical stability
+        log_normalizer = jnp.log(2 * jnp.pi * self._sigma**2)
+        log_phi = -0.5 * d2 / self._sigma**2
+        log_weights = jnp.log(selected_weights)
+
+        # Sum log probabilities for each target point (logsumexp for numerical stability)
+        log_prob_per_point = logsumexp(log_weights + log_phi - log_normalizer, axis=1)
+
+        # Weight by target weights and sum
+        return jnp.sum(log_prob_per_point * target_weights)
