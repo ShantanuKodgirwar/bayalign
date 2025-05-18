@@ -1,8 +1,7 @@
 import itertools
 
-import jax
-import jax.numpy as jnp
-from jax.scipy.spatial.transform import Rotation
+import numpy as np
+from scipy.spatial.transform import Rotation
 
 
 def get_unique_rotations(rotations, decimals=10):
@@ -22,17 +21,16 @@ def get_unique_rotations(rotations, decimals=10):
         An array of unique rotation matrices.
     """
     # Get the shape of a single rotation matrix
-    shape = jnp.shape(rotations)[1:]
+    shape = np.shape(rotations)[1:]
 
     # Flatten each rotation matrix for comparison
-    rotations = jnp.reshape(rotations, (len(rotations), -1))
+    rotations = np.reshape(rotations, (len(rotations), -1))
 
     # Round the rotations and find unique matrices
-    # Note: jnp.unique returns a tuple with the first element being the unique values
-    unique = jnp.unique(jnp.round(rotations, decimals=decimals), axis=0)[0]
+    unique = np.unique(np.round(rotations, decimals=decimals), axis=0)
 
     # Reshape back to original matrix dimensions
-    return jnp.reshape(unique, (len(unique),) + shape)
+    return np.reshape(unique, (len(unique),) + shape)
 
 
 class C600:
@@ -65,48 +63,44 @@ class C600:
     @classmethod
     def make_vertices(cls, upper_sphere=True):
         base = [[-1, 1]] * 4
-        nodes = jnp.zeros((120, 4))
+        nodes = np.zeros((120, 4))
         k = 2**4
 
-        # Convert itertools.product to JAX array
-        product_result = jnp.array(list(itertools.product(*base)))
-        nodes = nodes.at[:k].set(product_result)
+        nodes[:k] = list(itertools.product(*base))
 
         for j in range(4):
             for s in [-2, 2]:
-                nodes = nodes.at[k, j].set(s)
+                nodes[k, j] = s
                 k += 1
 
         # golden ratio
-        phi = (1 + jnp.sqrt(5)) / 2
+        phi = (1 + np.sqrt(5)) / 2
 
         base = base[:3]
         for perm in cls.even_perms:
             for a, b, c in itertools.product(*base):
-                nodes = nodes.at[k, perm[0]].set(a * phi)
-                nodes = nodes.at[k, perm[1]].set(b)
-                nodes = nodes.at[k, perm[2]].set(c / phi)
-                nodes = nodes.at[k, perm[3]].set(0)
+                nodes[k, perm[0]] = a * phi
+                nodes[k, perm[1]] = b
+                nodes[k, perm[2]] = c / phi
+                nodes[k, perm[3]] = 0
                 k += 1
 
         # normalize
-        nodes = nodes * 0.5
+        nodes *= 0.5
 
         # keep nodes covering half sphere
         if upper_sphere:
-            north = jnp.eye(4)[0]
-            mask = jnp.arccos(jnp.dot(nodes, north)) <= jnp.deg2rad(120)
+            north = np.eye(4)[0]
+            mask = np.arccos(np.dot(nodes, north)) <= np.deg2rad(120)
             nodes = nodes[mask]
 
         return nodes
 
     def create_tetrahedra(self):
-        angles = jnp.round(jnp.rad2deg(jnp.arccos(self.vertices @ self.vertices.T)))
+        angles = np.round(np.rad2deg(np.arccos(self.vertices @ self.vertices.T)))
         min_val = 36.0
         mask = angles == min_val
 
-        # Since JAX doesn't allow dynamic iteration, we'll collect all tetrahedra in a list
-        tetrahedra = []
         for i_idx, j_idx, k_idx, l_idx in itertools.combinations(
             range(len(self.vertices)), 4
         ):
@@ -118,12 +112,7 @@ class C600:
                 and mask[j_idx, l_idx]
                 and mask[k_idx, l_idx]
             ):
-                tetrahedra.append(
-                    self.vertices[jnp.array([i_idx, j_idx, k_idx, l_idx])]
-                )
-
-        # Return all collected tetrahedra
-        return tetrahedra
+                yield self.vertices[np.array([i_idx, j_idx, k_idx, l_idx])]
 
 
 def split_tetrahedron(vertices):
@@ -137,18 +126,18 @@ def split_tetrahedron(vertices):
     edge_indices = [(0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3)]
 
     def normed(x):
-        return x / jnp.linalg.norm(x)
+        return x / np.linalg.norm(x)
 
-    nodes = jnp.zeros((6, 4))
+    nodes = np.zeros((6, 4))
 
     # compute nodes in center of edges
     for k, (i, j) in enumerate(edge_indices):
-        nodes = nodes.at[k].set(normed(vertices[i] + vertices[j]))
+        nodes[k] = normed(vertices[i] + vertices[j])
 
     # check which skew edge is the shortest
     pairs = [(0, 5), (2, 4), (3, 1)]
-    dots = jnp.array([nodes[i] @ nodes[j] for i, j in pairs])
-    index = jnp.argmax(dots)
+    dots = np.array([nodes[i] @ nodes[j] for i, j in pairs])
+    index = np.argmax(dots)
 
     tetrahedra = [
         (vertices[0], nodes[0], nodes[2], nodes[3]),
@@ -157,41 +146,29 @@ def split_tetrahedron(vertices):
         (vertices[3], nodes[3], nodes[4], nodes[5]),
     ]
 
-    # Use jax.lax.cond instead of if-else for JAX compatibility
-    def index_0_branch(x):
-        return [
+    if index == 0:
+        tetrahedra += [
             (nodes[0], nodes[5], nodes[3], nodes[2]),
             (nodes[0], nodes[5], nodes[4], nodes[3]),
             (nodes[5], nodes[0], nodes[1], nodes[4]),
             (nodes[5], nodes[0], nodes[1], nodes[2]),
         ]
-
-    def index_1_branch(x):
-        return [
+    elif index == 1:
+        tetrahedra += [
             (nodes[0], nodes[4], nodes[3], nodes[2]),
             (nodes[0], nodes[1], nodes[4], nodes[2]),
             (nodes[5], nodes[2], nodes[1], nodes[4]),
             (nodes[5], nodes[3], nodes[2], nodes[4]),
         ]
-
-    def index_2_branch(x):
-        return [
+    elif index == 2:
+        tetrahedra += [
             (nodes[3], nodes[1], nodes[0], nodes[2]),
             (nodes[3], nodes[1], nodes[4], nodes[0]),
             (nodes[3], nodes[1], nodes[5], nodes[4]),
             (nodes[1], nodes[3], nodes[2], nodes[5]),
         ]
 
-    additional_tetrahedra = jax.lax.cond(
-        index == 0,
-        index_0_branch,
-        lambda x: jax.lax.cond(index == 1, index_1_branch, index_2_branch, None),
-        None,
-    )
-
-    tetrahedra.extend(additional_tetrahedra)
-
-    return jnp.array(tetrahedra)
+    return np.array(tetrahedra)
 
 
 def tessellate_rotations(n_discretize=2):
@@ -205,25 +182,20 @@ def tessellate_rotations(n_discretize=2):
         discretized tetrahedra converted to quaternion
     """
     cell600 = C600()
-    tetrahedra = jnp.array(list(cell600.create_tetrahedra()))
+    tetrahedra = np.array(list(cell600.create_tetrahedra()))
 
-    # Since JAX doesn't support dynamic loops well, we'll use a fixed loop
     for i in range(n_discretize):
-        # Map split_tetrahedron over all tetrahedra
-        # This part is tricky without jit/vmap, so we'll use a list comprehension
-        split_results = [split_tetrahedron(tet) for tet in tetrahedra]
-        tetrahedra = jnp.reshape(jnp.array(split_results), (-1, 4, 4))
+        # split every tetrahedra into eight new tetrahedra
+        tetrahedra = np.reshape(list(map(split_tetrahedron, tetrahedra)), (-1, 4, 4))
 
-    discretized_quat = jnp.mean(tetrahedra, axis=1)
-    discretized_quat = (
-        discretized_quat / jnp.linalg.norm(discretized_quat, axis=1)[:, None]
-    )
+    discretized_quat = tetrahedra.mean(axis=1)
+    discretized_quat /= np.linalg.norm(discretized_quat, axis=1)[:, None]
 
-    # Convert to rotation matrix (using a list comprehension since we're not using vmap)
-    rotations = jnp.array([Rotation.from_quat(q).as_matrix() for q in discretized_quat])
+    # convert to rotation matrix
+    rotations = [Rotation.from_quat(q).as_matrix() for q in discretized_quat]
     rotations = get_unique_rotations(rotations)
 
-    # Convert back to quaternion
-    discretized_quat = jnp.array([Rotation.from_matrix(R).as_quat() for R in rotations])
+    # convert back to quaternion
+    discretized_quat = [Rotation.from_matrix(R).as_quat() for R in rotations]
 
-    return discretized_quat
+    return np.array(discretized_quat)
