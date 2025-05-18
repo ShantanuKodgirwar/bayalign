@@ -26,6 +26,8 @@ import numpy as np
 from jax import grad, jit
 from jax.scipy.special import logsumexp
 
+from .kdtree import build_tree, query_neighbors
+
 # Import from your pointcloud module
 from .pointcloud import PointCloud
 from .utils import matrix2quat, quat2matrix
@@ -34,7 +36,6 @@ from .utils import matrix2quat, quat2matrix
 int_type = np.int32
 
 
-# TODO: Currently a brute-force KNN implementation (O(N^2))is used as it is pure JAX, however, better methods could be explored later.
 @partial(jit, static_argnames=("k",))
 def knn_search(target_points, source_points, k):
     """
@@ -65,13 +66,13 @@ def knn_search(target_points, source_points, k):
     dists2 = jnp.maximum(dists2, 0.0)
 
     # Find k smallest distances - k is assumed to be a static argument
-    _, indices = jax.lax.top_k(-dists2, k=k)
+    _, neighbors = jax.lax.top_k(-dists2, k=k)
 
     # Clip indices to valid range in case k > n_source
     n_source = source_points.shape[0]
-    indices = jnp.clip(indices, 0, n_source - 1)
+    neighbors = jnp.clip(neighbors, 0, n_source - 1)
 
-    return indices
+    return neighbors
 
 
 # ---------------------------------------------------------------------- #
@@ -145,6 +146,8 @@ class KernelCorrelation(Registration):
         Inverse temperature parameter that scales the log probability
     k : int, default=20
         Number of nearest neighbors to consider for each target point
+    use_kdtree : bool, default=False
+        Whether to use a KDTree for efficient nearest neighbor search
 
     Notes
     -----
@@ -157,6 +160,7 @@ class KernelCorrelation(Registration):
     sigma: float = 1.0
     beta: float = 1.0
     k: int = 20
+    use_kdtree: bool = False
 
     def __post_init__(self):
         """
@@ -218,11 +222,15 @@ class KernelCorrelation(Registration):
         source_weights = self.source.weights
 
         # Efficient nearest neighbors search
-        idx = knn_search(target_pos, src_pos_transformed, self._k)
+        if self.use_kdtree:
+            tree = build_tree(src_pos_transformed)
+            neighbors_idx, _ = query_neighbors(tree, target_pos, self._k)
+        else:
+            neighbors_idx = knn_search(target_pos, src_pos_transformed, self._k)
 
         # Gather selected points and weights
-        selected_points = jnp.take(src_pos_transformed, idx, axis=0)
-        selected_weights = jnp.take(source_weights, idx, axis=0)
+        selected_points = jnp.take(src_pos_transformed, neighbors_idx, axis=0)
+        selected_weights = jnp.take(source_weights, neighbors_idx, axis=0)
 
         # Compute squared distances
         d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
@@ -270,6 +278,8 @@ class MixtureSphericalGaussians(Registration):
         Inverse temperature parameter that scales the log probability
     k : int, default=20
         Number of nearest neighbors to use for efficient computation
+    use_kdtree : bool, default=False
+        Whether to use a KDTree for efficient nearest neighbors search
 
     Notes
     -----
@@ -283,6 +293,7 @@ class MixtureSphericalGaussians(Registration):
     sigma: float = 1.0
     beta: float = 1.0
     k: int = 20
+    use_kdtree: bool = False
 
     def __post_init__(self):
         """
@@ -345,11 +356,15 @@ class MixtureSphericalGaussians(Registration):
         source_weights = self.source.weights
 
         # Efficient nearest neighbors search
-        idx = knn_search(target_pos, src_pos_transformed, self._k)
+        if self.use_kdtree:
+            tree = build_tree(src_pos_transformed)
+            neighbors_idx, _ = query_neighbors(tree, target_pos, self._k)
+        else:
+            neighbors_idx = knn_search(target_pos, src_pos_transformed, self._k)
 
         # Gather selected points and weights
-        selected_points = jnp.take(src_pos_transformed, idx, axis=0)
-        selected_weights = jnp.take(source_weights, idx, axis=0)
+        selected_points = jnp.take(src_pos_transformed, neighbors_idx, axis=0)
+        selected_weights = jnp.take(source_weights, neighbors_idx, axis=0)
 
         # Compute squared distances
         d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
