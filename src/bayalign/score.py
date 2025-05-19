@@ -366,16 +366,14 @@ class MixtureSphericalGaussians(Registration):
         selected_points = jnp.take(src_pos_transformed, neighbors_idx, axis=0)
         selected_weights = jnp.take(source_weights, neighbors_idx, axis=0)
 
-        # Compute squared distances
+        # Compute squared distances from neighbors to target points
         d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
 
         # Compute probability in log-space for numerical stability
         log_normalizer = jnp.log(2 * jnp.pi * self._sigma**2)
         log_phi = -0.5 * d2 / self._sigma**2
         log_weights = jnp.log(selected_weights)
-
-        # Sum log probabilities for each target point (logsumexp for numerical stability)
-        log_prob_per_point = logsumexp(log_weights + log_phi - log_normalizer, axis=1)
+        logp = log_phi - log_normalizer + log_weights
 
         # Weight by target weights and sum
-        return jnp.sum(log_prob_per_point * target_weights)
+        return jnp.dot(logsumexp(logp, axis=1), target_weights)
