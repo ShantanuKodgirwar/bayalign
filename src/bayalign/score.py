@@ -59,7 +59,7 @@ def knn_search(target_points, source_points, k):
     # Compute squared Euclidean distances
     target_norm2 = jnp.sum(target_points**2, axis=1, keepdims=True)
     source_norm2 = jnp.sum(source_points**2, axis=1)
-    dots = jnp.dot(target_points, source_points.T)
+    dots = jax.lax.dot(target_points, source_points.T)
     dists2 = target_norm2 - 2 * dots + source_norm2
 
     # Ensure distances are non-negative
@@ -376,4 +376,4 @@ class MixtureSphericalGaussians(Registration):
         logp = log_phi - log_normalizer + log_weights
 
         # Weight by target weights and sum
-        return jnp.dot(logsumexp(logp, axis=1), target_weights)
+        return jax.lax.dot(logsumexp(logp, axis=1), target_weights)
