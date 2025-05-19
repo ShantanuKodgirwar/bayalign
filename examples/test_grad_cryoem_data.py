@@ -40,14 +40,14 @@ def load_target_cloud(class_idx=10, n_particles=2000, return_fitted_target=False
 
     if return_fitted_target:
         # converts to a PointCloud class with weights=1.0
-        return PointCloud(target_fit2d, weights=None), sigma
+        return target_fit2d, sigma
     else:
         return target_cloud, sigma
 
 
 def load_synthetic_target_from_source(source_cloud):
     # Project source with a random rotation to create target
-    key = random.PRNGKey(42)
+    key = random.key(42)
     quat = random.normal(key, shape=(4,))
     rotation = quat / jnp.linalg.norm(quat)
 
@@ -90,13 +90,14 @@ def load_cryo3D2D(class_idx=10, n_particles=2000, is_synthetic_target=False):
     print(f"Loading CryoEM data: class_idx={class_idx}, particles={n_particles}")
 
     # Load model data
-    model_path = f"data/ribosome_80S/model3d_{n_particles}.npz"
+    model_path = f"examples/data/ribosome_80S/model3d_{n_particles}.npz"
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
     model_3d = np.load(model_path)
-    source_cloud = RotationProjection(model_3d["positions"], model_3d["weights"])
-    source_cloud.positions -= source_cloud.center_of_mass
+    source_cloud = RotationProjection(
+        model_3d["positions"], model_3d["weights"]
+    ).centered_copy()
 
     # For this minimal test, let's use a simple target cloud derived from the source
     # to avoid loading the full CryoEM dataset
@@ -299,7 +300,7 @@ def test_gradient_computation(target, source, sigma):
 
     # Generate random test rotations
     print("\nGenerating test rotations...")
-    key = random.PRNGKey(1)
+    key = random.key(1)
     n_rotations = 3
 
     rotation_results = []
@@ -451,7 +452,7 @@ def debug_jax_grad(target, source, sigma):
         return jnp.log(jnp.sum(weighted_kernel) + 1e-10)
 
     # Generate a random rotation
-    key = random.PRNGKey(42)
+    key = random.key(42)
     quat = random.normal(key, shape=(4,))
     rotation = quat / jnp.linalg.norm(quat)
 
@@ -496,7 +497,7 @@ def debug_jax_grad(target, source, sigma):
 
 if __name__ == "__main__":
     # load point cloud data
-    if False:
+    if True:
         # uses a cryoEM projection image (fitted to a pointcloud) as 2D target
         # and 3D model as source
         target, source, sigma = load_cryo3D2D(
