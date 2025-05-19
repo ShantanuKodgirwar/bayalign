@@ -28,7 +28,6 @@ def run_scoring_method(
     scoring_metric,
     prob,
     quaternions,
-    target_fit2d,
     class_avg_idx,
     k_neighbours,
     save_path,
@@ -130,7 +129,7 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     # scoring metric ("MSG" or "KC")
-    scoring_metric = "KC"  # default is KC
+    scoring_metric = "MSG"  # default is KC
 
     # load target; index specifies which class avg will be used as a target
     class_avg_idx = 10
@@ -142,7 +141,7 @@ if __name__ == "__main__":
     )
 
     # no of points/ RBF kernels for source
-    n_particles = 1000
+    n_particles = 2000
 
     # load 3d model
     model = np.load(f"examples/data/ribosome_80S/model3d_{n_particles}.npz")
@@ -189,7 +188,6 @@ if __name__ == "__main__":
         scoring_metric,
         prob,
         quaternions,
-        target_fit2d,
         class_avg_idx,
         k_neighbours,
         save_path,
