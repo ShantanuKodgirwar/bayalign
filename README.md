@@ -56,7 +56,7 @@ The package `bayalign` and its *locked* dependencies are maintained by [uv](http
 ```bash
 uv sync --extra all
 ```
-This installs CPU dependencies (including the ones for the [examples](examples/) directory) in a virtual environment. For JAX to use GPU (cuda12), use the flag `all-gpu` instead of `all` in the above command. To activate this environment, 
+This installs CPU dependencies (including the ones for the examples directory) in a virtual environment. For JAX to use GPU (cuda12), use the flag `all-gpu` instead of `all` in the above command. To activate this environment, 
 
 ```bash
 source .venv/bin/activate
