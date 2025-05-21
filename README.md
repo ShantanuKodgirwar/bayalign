@@ -39,40 +39,30 @@ cd bayalign
 
 ### Via pip (legacy workflow)
 
-If you don't want to use uv (if you do, see below!), and simply rely on pip:
+If you don't want to use [uv](https://github.com/astral-sh/uv), a fast package manager (if you do, see below!), and simply rely on pip:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements-cpu.txt # or via `requirements-gpu.txt`
+pip install -r requirements-cpu.txt # or via `requirements-gpu.txt` if you have a GPU with cuda12
 pip install -e . --no-deps
 ```
 
+This installs all the dependencies, including the ones necessary for the [examples](examples/) directory.
+
 ### Via uv (recommended!)
 
-The package is maintained with the fast package manager [uv](https://github.com/astral-sh/uv). The package `bayalign` and its *locked* dependencies can be installed in a dedicated virtual environment (only supports venv) with the single command:
+The package `bayalign` and its *locked* dependencies are maintained by [uv](https://github.com/astral-sh/uv) and can be installed as:
 
 ```bash
-uv sync
+uv sync --extra all
 ```
-
-This installs the package along with the JAX-based CPU dependencies. To activate this environment, 
+This installs CPU dependencies (including the ones for the [examples](examples/) directory) in a virtual environment. For JAX to use GPU (cuda12), use the flag `all-gpu` instead of `all` in the above command. To activate this environment, 
 
 ```bash
 source .venv/bin/activate
 ```
 
-For a full list of installation options,
-
-| Command                    | Description                                            |
-| -------------------------- | ------------------------------------------------------ |
-| `uv sync --extra gpu`      | Installs the package with JAX GPU/CUDA 12 support      |
-| `uv sync --extra examples` | Installs dependencies to run the [examples](examples/) |
-| `uv sync --extra dev`      | Installs with development tools                        |
-| `uv sync --extra all`      | Installs with all dependencies (CPU version)           |
-| `uv sync --extra all-gpu`  | Installs with all dependencies (GPU version)           |
-
-
-Additionally for pip users, please export any dependency changes to a requirements file with a simple execution of the helper shell script as 
+Any dependency changes can be exported to a requirements file (for pip users) with the execution of the helper shell script as 
 
 ```bash
 ./export_requirements.sh
