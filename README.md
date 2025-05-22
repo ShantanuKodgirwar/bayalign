@@ -75,12 +75,6 @@ The package `bayalign` and all its *locked* dependencies are maintained by [uv](
 uv sync --extra all
 ```
 
-Export pip-compatible dependencies:
-
-```bash
-uv export --extra all --no-emit-project --no-hashes -o requirements.txt
-```
-
 ### Option 2: Using pip
 
 ```bash
