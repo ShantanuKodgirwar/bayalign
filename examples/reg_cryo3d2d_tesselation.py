@@ -1,4 +1,4 @@
-# 3D-to-2D Rigid registration by tesselation of the unit sphere for systematic
+# 3D-to-2D Rigid registration by tesselation of the unit sphere for systematic search of
 # rotations (generate ground truth). This the done as follows:
 # 1. Load class averages of the 80S ribosome and convert to a dense point cloud
 # 2. Fit a smaller 2D point cloud to this using expectation maximization which is our target
@@ -128,8 +128,8 @@ if __name__ == "__main__":
     save_path = "results/reg_3d2d_tesselation_KC/"
     os.makedirs(save_path, exist_ok=True)
 
-    # scoring metric ("MSG" or "KC")
-    scoring_metric = "MSG"  # default is KC
+    # scoring metric ("GMM" or "KC")
+    scoring_metric = "KC"  # default is KC
 
     # load target; index specifies which class avg will be used as a target
     class_avg_idx = 10
@@ -168,7 +168,7 @@ if __name__ == "__main__":
             beta=20.0,
             use_kdtree=False,
         )
-    elif scoring_metric == "MSG":  # "MSG"
+    elif scoring_metric == "GMM":
         target_pdf = GaussianMixtureModel(
             target_fit2d,
             source,
