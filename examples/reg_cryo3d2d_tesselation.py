@@ -129,7 +129,7 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     # scoring metric ("GMM" or "KC")
-    scoring_metric = "KC"  # default is KC
+    scoring_metric = "GMM"  # default is KC
 
     # load target; index specifies which class avg will be used as a target
     class_avg_idx = 10
