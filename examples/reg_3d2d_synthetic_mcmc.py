@@ -120,7 +120,7 @@ def plot_registration_results(
         transformed_source: 2D numpy array of transformed source points
         title_prefix: Prefix for the overall title
     """
-    fig = plt.figure(figsize=(18, 6))
+    fig = plt.figure(figsize=(21, 7))
 
     # Panel 1: 2D Target
     ax1 = fig.add_subplot(131)
@@ -129,7 +129,7 @@ def plot_registration_results(
         target.positions[:, 1],
         c="crimson",
         alpha=0.7,
-        s=25,
+        s=10,
         edgecolors="darkred",
         linewidth=0.5,
     )
@@ -148,7 +148,7 @@ def plot_registration_results(
         source_points[:, 2],
         c="steelblue",
         alpha=0.7,
-        s=20,
+        s=10,
     )
     ax2.set_title("3D Source Point Cloud")
     ax2.set_xlabel("X")
@@ -183,8 +183,8 @@ def plot_registration_results(
         target.positions[:, 0],
         target.positions[:, 1],
         c="crimson",
-        alpha=0.5,
-        s=20,
+        alpha=0.7,
+        s=10,
         label="Target 2D",
         edgecolors="darkred",
         linewidth=0.3,
@@ -195,8 +195,8 @@ def plot_registration_results(
         transformed_source[:, 1],
         c="steelblue",
         alpha=0.7,
-        s=20,
-        label="Transformed Source",
+        s=10,
+        label="Transformed Source \n(optimally rotated and projected)",
         edgecolors="darkblue",
         linewidth=0.3,
     )
@@ -207,8 +207,11 @@ def plot_registration_results(
     ax3.legend()
     ax3.set_aspect("equal", adjustable="box")
 
+    for ax in [ax1, ax2, ax3]:
+        ax.tick_params(labelbottom=False, labelleft=False)
+
     # Set overall title
-    # fig.suptitle(title_prefix, fontsize=16, y=0.98)
+    fig.suptitle(title_prefix, fontsize=16, y=0.98)
 
     plt.tight_layout()
     plt.subplots_adjust(top=0.90)  # Make room for suptitle
@@ -380,9 +383,9 @@ def main():
     TARGET_SEED = [769, 5726, 2871][0]
 
     # sampler params
-    n_samples = 100
+    n_samples = 1000
     burnin = 0.2
-    load_precomputed = False
+    load_precomputed = True
 
     # Create the point cloud
     points = create_synthetic_pointcloud(512)
@@ -480,14 +483,6 @@ def main():
 
     # transform the source (rotate and project) based on the based quaternion
     transformed_source = source.transform_positions(q_best)
-
-    # fig = plot_registration_results(
-    #     target, source, transformed_source, title_prefix="Registration Results"
-    # )
-    # fig.savefig(
-    #     f"results/reg_3d2d_synthetic/{SCORING_METRIC}_{SAMPLER}_seed_{TARGET_SEED}.png",
-    #     dpi=150,
-    # )
 
     # Enhanced plot with metrics
     _, reg_error, rot_error = plot_registration_with_metrics(
