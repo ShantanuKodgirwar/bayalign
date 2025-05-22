@@ -82,3 +82,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e . --no-deps
 ```
+
+## Issues
+
+If you encounter any problems, have questions, please feel free to [open an issue](https://github.com/ShantanuKodgirwar/bayalign/issues).
