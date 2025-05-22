@@ -383,9 +383,9 @@ def main():
     TARGET_SEED = [769, 5726, 2871][0]
 
     # sampler params
-    n_samples = 1000
+    n_samples = 100
     burnin = 0.2
-    load_precomputed = True
+    load_precomputed = False
 
     # Create the point cloud
     points = create_synthetic_pointcloud(512)
