@@ -15,9 +15,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gpu = [
-    "jax[cuda12]>=0.6.0",  # This will override the CPU version with the GPU version
-]
 examples = [
     "scipy>=1.15.2",
     "arviz>=0.21.0",
@@ -37,9 +34,6 @@ dev = [
 ]
 all = [
     "bayalign[examples,dev]",
-]
-all-gpu = [
-    "bayalign[gpu,examples,dev]",
 ]
 
 [tool.setuptools]
