@@ -3,9 +3,9 @@
 
 🛠️ *work-in-progress* 🛠️
 
-*Bayalign* is a lightweight JAX-based library for Bayesian inference in rigid point cloud registration using Geodesic slice sampling on the sphere (GeoSSS) for inference. See the package [`geosss`](https://github.com/microscopic-image-analysis/geosss) for details.
+*Bayalign* is a lightweight JAX-based library for rigid point cloud registration using efficient Bayesian inference via geodesic slice sampling on the sphere (GeoSSS) for inference. See the package [`geosss`](https://github.com/microscopic-image-analysis/geosss) for details.
 
-The package is tailored for scientific applications such as Cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with noisy or partial 2D projections.
+The package is tailored for any rigid registration problem and has mainly been motivated from a scientific application such as Cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with noisy or partial 2D projections.
 
 ## Features
 - Supports 3D-2D and 3D-3D rigid registration
