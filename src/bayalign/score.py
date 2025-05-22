@@ -18,13 +18,12 @@ is set everywhere. If needed, we could add support for translations in the futur
 
 import warnings
 from dataclasses import dataclass
-from functools import partial
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import grad, jit
 from jax.scipy.special import logsumexp
+from jax.tree_util import Partial
 
 from .kdtree import build_tree, query_neighbors
 
@@ -36,43 +35,34 @@ from .utils import matrix2quat, quat2matrix
 int_type = np.int32
 
 
-@partial(jit, static_argnames=("k",))
-def knn_search(target_points, source_points, k):
+@Partial(jax.jit, static_argnums=(2,))
+def query_neighbors_pairwise(points, query, k):
     """
-    Efficient JAX-compatible K-nearest neighbors search.
+    Find the k-nearest neighbors by forming a pairwise distance matrix.
+    A brute-force O(N^2) implementation.
 
     Parameters
     ----------
-    target_points : jnp.ndarray
-        Query points, shape (M, D)
-    source_points : jnp.ndarray
-        Reference points, shape (N, D)
+    points: jnp.ndarray
+        (N, d) Points to search.
+    query: jnp.ndarray
+        (d,) or (Q, d) Query point(s).
     k : int
-        Number of nearest neighbors to find
-        Assumed to be a static value for JIT compilation
+        Number of neighbors to return.
 
     Returns
     -------
     jnp.ndarray
-        Indices of nearest neighbors, shape (M, k)
+        (k,) or (Q, k) Indices of nearest neighbors.
+    jnp.ndarray
+        (k,) or (Q, k) Distances to nearest neighbors.
     """
-    # Compute squared Euclidean distances
-    target_norm2 = jnp.sum(target_points**2, axis=1, keepdims=True)
-    source_norm2 = jnp.sum(source_points**2, axis=1)
-    dots = jax.lax.dot(target_points, source_points.T)
-    dists2 = target_norm2 - 2 * dots + source_norm2
-
-    # Ensure distances are non-negative
-    dists2 = jnp.maximum(dists2, 0.0)
-
-    # Find k smallest distances - k is assumed to be a static argument
-    _, neighbors = jax.lax.top_k(-dists2, k=k)
-
-    # Clip indices to valid range in case k > n_source
-    n_source = source_points.shape[0]
-    neighbors = jnp.clip(neighbors, 0, n_source - 1)
-
-    return neighbors
+    query_shaped = jnp.atleast_2d(query)
+    pairwise_distances = jnp.linalg.norm(points - query_shaped[:, None], axis=-1)
+    distances, indices = jax.lax.top_k(-1 * pairwise_distances, k)
+    if query.ndim == 1:
+        return indices.squeeze(0), -1 * distances.squeeze(0)
+    return indices, -1 * distances
 
 
 # ---------------------------------------------------------------------- #
@@ -106,7 +96,7 @@ class Registration:
     def gradient(self, rotation, translation=None):
         """Compute gradient with respect to quaternion parameters."""
         q = self._ensure_quaternion(rotation)
-        grad_q = grad(lambda q: self._log_prob_impl(q, translation))(q)
+        grad_q = jax.grad(lambda q: self._log_prob_impl(q, translation))(q)
         return self.beta * grad_q
 
     def _log_prob_impl(self, q, translation=None):
@@ -224,21 +214,23 @@ class KernelCorrelation(Registration):
         # Efficient nearest neighbors search
         if self.use_kdtree:
             tree = build_tree(src_pos_transformed)
-            neighbors_idx, _ = query_neighbors(tree, target_pos, self._k)
+            neighbors_idx, dists = query_neighbors(
+                tree,
+                target_pos,
+                self._k,
+            )
         else:
-            neighbors_idx = knn_search(target_pos, src_pos_transformed, self._k)
-
-        # Gather selected points and weights
-        selected_points = jnp.take(src_pos_transformed, neighbors_idx, axis=0)
-        selected_weights = jnp.take(source_weights, neighbors_idx, axis=0)
-
-        # Compute squared distances
-        d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
+            neighbors_idx, dists = query_neighbors_pairwise(
+                target_pos,
+                src_pos_transformed,
+                self._k,
+            )
 
         # Compute the Gaussian kernel
         log_kernel_values = (
-            -0.5 * d2 / (self._sigma**2)
-            + jnp.log(selected_weights)
+            -0.5 * jnp.square(dists) / (self._sigma**2)
+            # + jnp.log(selected_weights)
+            + jnp.log(source_weights.at[neighbors_idx].get())
             + jnp.log(target_weights[:, None])
         )
 
@@ -358,21 +350,22 @@ class GaussianMixtureModel(Registration):
         # Efficient nearest neighbors search
         if self.use_kdtree:
             tree = build_tree(src_pos_transformed)
-            neighbors_idx, _ = query_neighbors(tree, target_pos, self._k)
+            neighbors_idx, dists = query_neighbors(
+                tree,
+                target_pos,
+                self._k,
+            )
         else:
-            neighbors_idx = knn_search(target_pos, src_pos_transformed, self._k)
-
-        # Gather selected points and weights
-        selected_points = jnp.take(src_pos_transformed, neighbors_idx, axis=0)
-        selected_weights = jnp.take(source_weights, neighbors_idx, axis=0)
-
-        # Compute squared distances from neighbors to target points
-        d2 = jnp.sum((target_pos[:, None, :] - selected_points) ** 2, axis=-1)
+            neighbors_idx, dists = query_neighbors_pairwise(
+                target_pos,
+                src_pos_transformed,
+                self._k,
+            )
 
         # Compute probability in log-space for numerical stability
         log_normalizer = jnp.log(2 * jnp.pi * self._sigma**2)
-        log_phi = -0.5 * d2 / self._sigma**2
-        log_weights = jnp.log(selected_weights)
+        log_phi = -0.5 * jnp.square(dists) / self._sigma**2
+        log_weights = jnp.log(source_weights.at[neighbors_idx].get())
         logp = log_phi - log_normalizer + log_weights
 
         # Weight by target weights and sum
