@@ -18,21 +18,28 @@ is set everywhere. If needed, we could add support for translations in the futur
 
 import warnings
 from dataclasses import dataclass
+from functools import partial
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from jax.scipy.special import logsumexp
 from jax.tree_util import Partial
+from jaxtyping import Array, Float
 
 from .kdtree import build_tree, query_neighbors
 
 # Import from your pointcloud module
 from .pointcloud import PointCloud
+from .types import Quaternion
 from .utils import matrix2quat, quat2matrix
 
-# Define the integer type to be used for indices
-int_type = np.int32
+# Type aliases for clarity
+Points2D = Float[Array, "n 2"]
+Points3D = Float[Array, "n 3"]
+Weights = Float[Array, "n"]
+Distances = Float[Array, "n k"]
+Indices = Float[Array, "n k"]
 
 
 @Partial(jax.jit, static_argnums=(2,))
@@ -88,16 +95,18 @@ class Registration:
         return quat2matrix(rotation) if self._is_quaternion(rotation) else rotation
 
     # public API
+    @partial(jax.jit, static_argnums=(0,))
     def log_prob(self, rotation, translation=None):
         """Compute log probability for a given rotation."""
         q = self._ensure_quaternion(rotation)
         return self.beta * self._log_prob_impl(q, translation)
 
+    @partial(jax.jit, static_argnums=(0,))
     def gradient(self, rotation, translation=None):
         """Compute gradient with respect to quaternion parameters."""
         q = self._ensure_quaternion(rotation)
-        grad_q = jax.grad(lambda q: self._log_prob_impl(q, translation))(q)
-        return self.beta * grad_q
+        grad_fn = jax.grad(lambda q: self._log_prob_impl(q, translation))
+        return self.beta * grad_fn(q)
 
     def _log_prob_impl(self, q, translation=None):
         """Implementation of log probability calculation."""
@@ -153,26 +162,32 @@ class KernelCorrelation(Registration):
     use_kdtree: bool = False
 
     def __post_init__(self):
-        """
-        Initialize parameters after instance creation.
-
-        Validates inputs, converts parameters to the correct types,
-        and issues warnings for potential numerical issues.
-        """
-        sigma = float(self.sigma)
-        k = int(self.k)
-
-        # Check for numerical stability with small sigma values
-        if sigma < 1e-6:
+        """Precompute constants for efficiency."""
+        # Validate inputs
+        if self.sigma < 1e-6:
             warnings.warn(
-                f"Small sigma value ({sigma}) may cause numerical instability"
+                f"Small sigma value ({self.sigma}) may cause numerical instability"
             )
 
-        # Store parameters
-        object.__setattr__(self, "_sigma", sigma)
-        object.__setattr__(self, "_k", k)
+        # Store frequently accessed values
+        object.__setattr__(self, "_sigma", float(self.sigma))
+        object.__setattr__(self, "_k", min(int(self.k), self.source.size))
+        object.__setattr__(self, "_inv_2sigma_sq", 1.0 / (2.0 * self.sigma**2))
 
-    def _log_prob_impl(self, q, translation=None):
+        # Pre-extract arrays to avoid repeated attribute access
+        object.__setattr__(self, "_target_pos", self.target.positions)
+        object.__setattr__(self, "_target_weights", self.target.weights)
+        object.__setattr__(self, "_source_pos", self.source.positions)
+        object.__setattr__(self, "_source_weights", self.source.weights)
+
+        # Precompute log weights for efficiency
+        object.__setattr__(self, "_log_target_weights", jnp.log(self._target_weights))
+        object.__setattr__(self, "_log_source_weights", jnp.log(self._source_weights))
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _log_prob_impl(
+        self, q: Quaternion, translation: Optional[Array] = None
+    ) -> float:
         """
         Implementation of log probability calculation for Kernel Correlation.
 
@@ -200,42 +215,39 @@ class KernelCorrelation(Registration):
         This implementation is fully JAX-compatible to support auto-differentiation
         and uses optimized KNN search for efficiency.
         """
-        # Convert quaternion to rotation matrix
-        R = quat2matrix(q)
 
         # Transform source points
+        R = quat2matrix(q)
         src_pos_transformed = self.source.transform_positions(R, translation)
-
-        # Extract target arrays
-        target_pos = self.target.positions
-        target_weights = self.target.weights
-        source_weights = self.source.weights
 
         # Efficient nearest neighbors search
         if self.use_kdtree:
             tree = build_tree(src_pos_transformed)
             neighbors_idx, dists = query_neighbors(
                 tree,
-                target_pos,
+                self._target_pos,
                 self._k,
             )
         else:
             neighbors_idx, dists = query_neighbors_pairwise(
-                target_pos,
+                self._target_pos,
                 src_pos_transformed,
                 self._k,
             )
 
+        # Explicitly gather the weights - more clear and sometimes faster
+        # indices has shape (n_targets, k)
+        selected_log_weights = jnp.take(self._log_source_weights, neighbors_idx, axis=0)
+
         # Compute the Gaussian kernel
         log_kernel_values = (
-            -0.5 * jnp.square(dists) / (self._sigma**2)
-            # + jnp.log(selected_weights)
-            + jnp.log(source_weights.at[neighbors_idx].get())
-            + jnp.log(target_weights[:, None])
+            -dists * dists * self._inv_2sigma_sq
+            + +selected_log_weights  # shape (n_targets, k)
+            + self._log_target_weights[:, None]  # Broadcasting to (n_targets, 1)
         )
 
         # Return log probability (logsumexp for numerical stability)
-        return logsumexp(log_kernel_values, axis=None)
+        return logsumexp(log_kernel_values)
 
 
 @dataclass(frozen=True)
@@ -288,26 +300,35 @@ class GaussianMixtureModel(Registration):
     use_kdtree: bool = False
 
     def __post_init__(self):
-        """
-        Initialize parameters after instance creation.
-
-        Validates inputs, converts parameters to the correct types,
-        and issues warnings for potential numerical issues.
-        """
-        sigma = float(self.sigma)
-        k = int(self.k)
-
-        # Check for numerical stability with small sigma values
-        if sigma < 1e-6:
+        """Precompute constants for efficiency."""
+        # Validate
+        if self.sigma < 1e-6:
             warnings.warn(
-                f"Small sigma value ({sigma}) may cause numerical instability"
+                f"Small sigma value ({self.sigma}) may cause numerical instability"
             )
 
-        # Store parameters
-        object.__setattr__(self, "_sigma", sigma)
-        object.__setattr__(self, "_k", k)
+        # Store constants
+        object.__setattr__(self, "_sigma", float(self.sigma))
+        object.__setattr__(self, "_k", min(int(self.k), self.source.size))
+        object.__setattr__(self, "_inv_sigma_sq", 1.0 / (self.sigma**2))
 
-    def _log_prob_impl(self, q, translation=None):
+        # Precompute normalization constant
+        d = self.target.dim
+        object.__setattr__(
+            self, "_log_norm", -0.5 * d * jnp.log(2 * jnp.pi * self.sigma**2)
+        )
+
+        # Pre-extract arrays
+        object.__setattr__(self, "_target_pos", self.target.positions)
+        object.__setattr__(self, "_target_weights", self.target.weights)
+        object.__setattr__(self, "_source_pos", self.source.positions)
+        object.__setattr__(self, "_source_weights", self.source.weights)
+        object.__setattr__(self, "_log_source_weights", jnp.log(self._source_weights))
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _log_prob_impl(
+        self, q: Quaternion, translation: Optional[Array] = None
+    ) -> float:
         """
         Implementation of log probability calculation for Mixture of Spherical Gaussians.
 
@@ -336,37 +357,36 @@ class GaussianMixtureModel(Registration):
         full mixture model would require evaluating all pairs of points, which
         would be computationally prohibitive for large point clouds.
         """
-        # Convert quaternion to rotation matrix
-        R = quat2matrix(q)
 
         # Transform source points
+        R = quat2matrix(q)
         src_pos_transformed = self.source.transform_positions(R, translation)
-
-        # Extract target arrays
-        target_pos = self.target.positions
-        target_weights = self.target.weights
-        source_weights = self.source.weights
 
         # Efficient nearest neighbors search
         if self.use_kdtree:
             tree = build_tree(src_pos_transformed)
             neighbors_idx, dists = query_neighbors(
                 tree,
-                target_pos,
+                self._target_pos,
                 self._k,
             )
         else:
             neighbors_idx, dists = query_neighbors_pairwise(
-                target_pos,
+                self._target_pos,
                 src_pos_transformed,
                 self._k,
             )
 
-        # Compute probability in log-space for numerical stability
-        log_normalizer = jnp.log(2 * jnp.pi * self._sigma**2)
-        log_phi = -0.5 * jnp.square(dists) / self._sigma**2
-        log_weights = jnp.log(source_weights.at[neighbors_idx].get())
-        logp = log_phi - log_normalizer + log_weights
+        # Compute log probabilities with fused operations
+        # log p(y_i | x_j) = log_norm - 0.5 * ||y_i - x_j||^2 / sigma^2 + log(w_j)
+        log_probs = (
+            self._log_norm
+            - 0.5 * dists * dists * self._inv_sigma_sq
+            + self._log_source_weights[neighbors_idx]
+        )
 
-        # Weight by target weights and sum
-        return jax.lax.dot(logsumexp(logp, axis=1), target_weights)
+        # For each target point, compute log sum exp over k nearest sources
+        target_log_probs = logsumexp(log_probs, axis=1)
+
+        # Weighted sum over target points
+        return jnp.dot(target_log_probs, self._target_weights)
