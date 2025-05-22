@@ -14,7 +14,7 @@ import matplotlib.pylab as plt
 import numpy as np
 
 from bayalign.pointcloud import RotationProjection
-from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
+from bayalign.score import GaussianMixtureModel, KernelCorrelation
 from bayalign.sphere_tesselation import tessellate_rotations
 from bayalign.utils import take_time
 from examples.cryo_utils import (
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     # Select the scoring approach
     if scoring_metric == "KC":
-        prob = KernelCorrelation(
+        target_pdf = KernelCorrelation(
             target_fit2d,
             source,
             sigma_truth,
@@ -169,7 +169,7 @@ if __name__ == "__main__":
             use_kdtree=False,
         )
     elif scoring_metric == "MSG":  # "MSG"
-        prob = MixtureSphericalGaussians(
+        target_pdf = GaussianMixtureModel(
             target_fit2d,
             source,
             sigma_truth,
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     # Run the selected scoring method
     q_best, logprobs = run_scoring_method(
         scoring_metric,
-        prob,
+        target_pdf,
         quaternions,
         class_avg_idx,
         k_neighbours,

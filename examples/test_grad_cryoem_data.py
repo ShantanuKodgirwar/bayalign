@@ -13,7 +13,7 @@ from jax import grad, random
 from scipy.optimize import approx_fprime
 
 from bayalign.pointcloud import PointCloud, RotationProjection
-from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
+from bayalign.score import GaussianMixtureModel, KernelCorrelation
 from examples.cryo_utils import (
     fit_model2d,
     load_class_average,
@@ -296,7 +296,7 @@ def test_gradient_computation(target, source, sigma):
 
     # Create MixtureSphericalGaussians with brute force
     print("\nCreating MixtureSphericalGaussians scorer...")
-    msg = MixtureSphericalGaussians(target, source, sigma, k=k, beta=beta)
+    gmm = GaussianMixtureModel(target, source, sigma, k=k, beta=beta)
 
     # Generate random test rotations
     print("\nGenerating test rotations...")
@@ -323,7 +323,7 @@ def test_gradient_computation(target, source, sigma):
 
         # Test MixtureSphericalGaussians
         print("\nTesting MixtureSphericalGaussians:")
-        msg_results = compare_gradients(msg, rotation)
+        msg_results = compare_gradients(gmm, rotation)
 
         rotation_results.append(
             {"rotation": rotation, "kc_results": kc_results, "msg_results": msg_results}

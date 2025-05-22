@@ -11,7 +11,7 @@ from scipy.optimize import approx_fprime
 
 # Import your implementation
 from bayalign.pointcloud import PointCloud, RotationProjection
-from bayalign.score import KernelCorrelation, MixtureSphericalGaussians
+from bayalign.score import GaussianMixtureModel, KernelCorrelation
 from bayalign.utils import quat2matrix
 
 # Set random seed for reproducibility
@@ -135,18 +135,18 @@ def test_gradient_flow():
 
     # Test MixtureSphericalGaussians with brute force in 3D-2D scenario
     print("\n2. Testing MixtureSphericalGaussians (3D-2D) with brute force...")
-    msg_3d2d = MixtureSphericalGaussians(target_2d, projection_source, sigma=0.5, k=10)
+    gmm_3d2d = GaussianMixtureModel(target_2d, projection_source, sigma=0.5, k=10)
 
-    log_prob_3d2d = msg_3d2d.log_prob(test_rotation)
+    log_prob_3d2d = gmm_3d2d.log_prob(test_rotation)
     print(f"  Log probability: {log_prob_3d2d}")
 
     try:
         # Automatic gradient
-        grad_3d2d = msg_3d2d.gradient(test_rotation)
+        grad_3d2d = gmm_3d2d.gradient(test_rotation)
         print(f"  Automatic gradient: {grad_3d2d}")
 
         # Numerical gradient
-        num_grad_3d2d = compute_numerical_gradient(msg_3d2d, test_rotation)
+        num_grad_3d2d = compute_numerical_gradient(gmm_3d2d, test_rotation)
         print(f"  Numerical gradient: {num_grad_3d2d}")
 
         # Compute relative difference

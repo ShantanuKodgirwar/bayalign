@@ -247,7 +247,7 @@ class KernelCorrelation(Registration):
 
 
 @dataclass(frozen=True)
-class MixtureSphericalGaussians(Registration):
+class GaussianMixtureModel(Registration):
     """
     Mixture of Spherical Gaussians (MSG) scoring method for rigid registration.
 
