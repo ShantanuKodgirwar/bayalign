@@ -1,8 +1,7 @@
 # Bayalign
-<div align="center">
-    [![PyPI](https://img.shields.io/pypi/v/bayalign)](https://pypi.org/project/bayalign/)
-    ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
-</div>
+[![PyPI](https://img.shields.io/pypi/v/bayalign)](https://pypi.org/project/bayalign/)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+
 🛠️ *work-in-progress* 🛠️
 
 *Bayalign* is a lightweight JAX-based library for rigid point cloud registration using efficient Bayesian inference via geodesic slice sampling on the sphere (GeoSSS) for inference. See the package [`geosss`](https://github.com/microscopic-image-analysis/geosss) for details.
