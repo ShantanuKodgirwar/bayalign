@@ -6,7 +6,7 @@
 
 *Bayalign* is a lightweight JAX-based library for rigid point cloud registration using efficient Bayesian inference via geodesic slice sampling on the sphere (GeoSSS) for inference. See the package [`geosss`](https://github.com/microscopic-image-analysis/geosss) for details.
 
-The package is tailored for any rigid registration problem and has mainly been motivated from a scientific application such as Cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with noisy or partial 2D projections.
+The package is tailored for any rigid registration problem (currently doesn't support translation estimation) and has mainly been motivated from a scientific application such as Cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with noisy or partial 2D projections.
 
 <p align="center">
 <img src="https://github.com/ShantanuKodgirwar/bayalign/blob/8fc3448b6f634723146101f0fc01a6e7b7921f96/assets/reg3d2d.png" width="800">
@@ -29,6 +29,8 @@ pip install bayalign
 A basic example of 3D-to-2D registration:
 
 ```python
+import jax.numpy as jnp
+
 from bayalign.pointcloud import PointCloud, RotationProjection
 from bayalign.score import GaussianMixtureModel
 from bayalign.inference import ShrinkageSphericalSliceSampler
@@ -47,10 +49,9 @@ sampler = ShrinkageSphericalSliceSampler(target_pdf, init_q, seed=123)
 samples = sampler.sample(n_samples=100, burnin=0.2)
 
 # Find the best rotation
-log_probs = np.array([target_pdf.log_prob(q) for q in samples])
-best_rot = samples[np.argmax(log_probs)]
+log_probs = jnp.asarray([target_pdf.log_prob(q) for q in samples])
+best_rot = samples[jnp.argmax(log_probs)]
 transformed_source = source.transform_positions(best_rot)
-
 ```
 
 For 3D-3D registration, use `PointCloud` for both target and source. Check out the [examples](examples/) directory for detailed use cases using synthetic and cryo-EM data. 
