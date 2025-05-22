@@ -11,6 +11,7 @@ wheels/
 
 # VSC files
 .ropeproject
+.DS_Store
 
 # Data directory
 data/*
