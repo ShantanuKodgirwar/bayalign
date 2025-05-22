@@ -8,7 +8,7 @@
 The package is tailored for any rigid registration problem and has mainly been motivated from a scientific application such as Cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with noisy or partial 2D projections.
 
 <p align="center">
-<img src="https://github.com/ShantanuKodgirwar/bayalign/blob/b8820067e55ae1a9666ba2c2e0c9fc3852276c11/assets/3d2d.png" width="800">
+<img src="https://github.com/ShantanuKodgirwar/bayalign/blob/b8820067e55ae1a9666ba2c2e0c9fc3852276c11/assets/reg3d2d.png" width="800">
 </p>
 
 ## Features
