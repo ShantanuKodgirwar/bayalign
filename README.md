@@ -37,11 +37,11 @@ from bayalign.inference import ShrinkageSphericalSliceSampler
 from bayalign.sphere_utils import sample_sphere
 
 # Define 2D target and 3D source point clouds
-target_2d = PointCloud(positions, weights)               # shape (N, 2)
-source_3d = RotationProjection(positions, weights)       # shape (M, 3)
+target = PointCloud(positions, weights)               # shape (N, 2)
+source = RotationProjection(positions, weights)       # shape (M, 3)
 
 # Define a target probability model using GMM
-target_pdf = GaussianMixtureModel(target_2d, source_3d, sigma=1.0, k=20)
+target_pdf = GaussianMixtureModel(target, source, sigma=1.0, k=20)
 
 # Sample from the posterior over 3D rotations (quaternions)
 init_q = sample_sphere(random.key(645), d=3)             # initial quaternion (4,)
