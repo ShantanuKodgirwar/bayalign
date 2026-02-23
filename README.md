@@ -67,20 +67,17 @@ git clone https://github.com/ShantanuKodgirwar/bayalign.git
 cd bayalign
 ```
 
-### Option 1: Using uv (recommended!)
-
 The package `bayalign` and all its *locked* dependencies are maintained by [uv](https://github.com/astral-sh/uv) and can be installed within a virtual environment as:
 
 ```bash
 uv sync --extra all
 ```
+This also includes the dependencies needed to run the examples.
 
-### Option 2: Using pip
+### With GPU
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e . --no-deps
+uv sync --extra all,cuda12 # or cuda13 for a newer GPU (SM > 7.5)
 ```
 
 ## Issues
