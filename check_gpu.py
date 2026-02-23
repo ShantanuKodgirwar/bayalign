@@ -31,7 +31,7 @@ def check_jax_gpu():
     try:
         gpu_count = jax.device_count("gpu")
         print(f"- GPU device count: {gpu_count}")
-    except:
+    except Exception:
         print("- GPU devices not accessible")
     
     # More detailed platform check using the new API
@@ -55,7 +55,7 @@ def check_jax_gpu():
             from jax.lib import cuda_versions
             print(f"- CUDA version: {cuda_versions.cuda_version}")
             print(f"- CuDNN version: {cuda_versions.cudnn_version}")
-        except:
+        except Exception:
             print("- Could not detect CUDA version details")
     else:
         print("\n❌ JAX is using CPU, not GPU!")
