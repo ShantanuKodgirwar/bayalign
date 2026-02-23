@@ -7,9 +7,9 @@ name = "bayalign"
 version = "0.1.2"
 description = "Bayesian inference for 3D-2D rigid registration written in JAX."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "jax>=0.6.0",
+    "jax>=0.8.0",
     "jaxtyping>=0.3.2",
     "joblib>=1.5.0",
     "numpy>=2.2.5",
@@ -27,11 +27,17 @@ examples = [
     "scikit-image>=0.25.2",
     "seaborn>=0.13.2",
     "nbformat>=5.10.4",
-    "h5py>=3.13.0",
+    "h5py>=3.15.0",
 ]
 dev = [
     "ruff>=0.11.8",
     "ipykernel>=6.29.5", 
+]
+cuda12 = [
+    "jax[cuda12]>=0.6.0",
+]
+cuda13 = [
+    "jax[cuda13]>=0.6.0",
 ]
 all = [
     "bayalign[examples,dev]",
