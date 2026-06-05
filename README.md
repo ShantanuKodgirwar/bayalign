@@ -4,6 +4,12 @@
 
 *Bayalign* is a lightweight JAX-based library for pose matching (rigid registration) using a geometric Bayesian inference method via geodesic slice sampling on the sphere (GeoSSS). The biggest strength of GeoSSS is dealing with extreme multimodality and locating a sharp global mode where almost all the probability mass resides. See the [`geosss`](https://github.com/microscopic-image-analysis/geosss) package for more details.
 
+## Features
+- Supports 3D-2D and 3D-3D pose matching
+- GPU acceleration, Automatic differentiation, JIT via JAX
+- Fast inference via GeoSSS
+- Uses Gaussian Mixture Models (GMM) for scoring the rigid poses
+
 ## Motivation
 
 The package is tailored for any pose matching problem (currently doesn't support translation estimation) and has mainly been motivated from a scientific application such as random tomography of cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with 2D projections (3D-2D pose matching). This is a challenging task especially for 3D biomolecules with many structural symmetries and repetitive features making the 2D projection highly ambiguous creating a highly multimodal distribution. Gradient-based methods such as Hamiltonian Monte Carlo often fail for these tasks, however GeoSSS manages to find the global mode with very high reliability.
@@ -14,12 +20,6 @@ The package is tailored for any pose matching problem (currently doesn't support
 <img src="https://github.com/ShantanuKodgirwar/bayalign/blob/8fc3448b6f634723146101f0fc01a6e7b7921f96/assets/reg3d2d.png" width="800">
 </p>
 
-## Features
-- Supports 3D-2D and 3D-3D pose matching
-- GPU acceleration, Automatic differentiation, JIT via JAX
-- Fast inference via GeoSSS
-- Uses Gaussian Mixture Models (GMM) for scoring the rigid poses
- 
 ## Installation
 
 ```bash
