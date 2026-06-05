@@ -11,7 +11,7 @@ The package is tailored for any rigid registration problem (currently doesn't su
 </p>
 
 ## Features
-- Supports 3D-2D and 3D-3D rigid registration
+- Supports 3D-2D and 3D-3D pose matching
 - GPU acceleration, Automatic differentiation, JIT via JAX
 - Fast inference via GeoSSS
 - Uses Gaussian Mixture Models (GMM) for scoring the rigid poses
