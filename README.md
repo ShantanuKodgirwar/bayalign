@@ -12,7 +12,7 @@
 
 ## Motivation
 
-The package is tailored for any pose matching problem (currently doesn't support translation estimation) and has mainly been motivated from a scientific application such as random tomography of cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with 2D projections (3D-2D pose matching). This is a challenging task especially for 3D biomolecules with many structural symmetries and repetitive features making the 2D projection highly ambiguous creating a highly multimodal distribution. Gradient-based methods such as Hamiltonian Monte Carlo often fail for these tasks, however GeoSSS manages to find the global mode with very high reliability.
+The package is tailored for any pose matching problem (currently doesn't support translation estimation) and has mainly been motivated from a scientific application such as random tomography of cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with a given 2D projection image, since the projection direction is unknown (3D-2D pose matching). This is a challenging task especially for 3D biomolecules with many structural symmetries and repetitive features making the 2D projection highly ambiguous creating a highly multimodal distribution. Gradient-based methods such as Hamiltonian Monte Carlo often fail for these tasks, however GeoSSS manages to find the global mode with very high reliability.
 
 ## Toy demo
 
