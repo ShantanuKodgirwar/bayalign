@@ -2,9 +2,13 @@
 [![PyPI](https://img.shields.io/pypi/v/bayalign)](https://pypi.org/project/bayalign/)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 
-*Bayalign* is a lightweight JAX-based library for rigid point cloud registration using efficient Bayesian inference via geodesic slice sampling on the sphere (GeoSSS). See the package [`geosss`](https://github.com/microscopic-image-analysis/geosss) for details.
+*Bayalign* is a lightweight JAX-based library for pose matching (rigid registration) using a geometric Bayesian inference method via geodesic slice sampling on the sphere (GeoSSS). The biggest strength of GeoSSS is dealing with extreme multimodality and locating a sharp global mode where almost all the probability mass resides. See the [`geosss`](https://github.com/microscopic-image-analysis/geosss) package for more details.
 
-The package is tailored for any rigid registration problem (currently doesn't support translation estimation) and has mainly been motivated from a scientific application such as Cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with noisy or partial 2D projections.
+## Motivation
+
+The package is tailored for any pose matching problem (currently doesn't support translation estimation) and has mainly been motivated from a scientific application such as random tomography of cryo-EM where the goal is to estimate the rotation of a 3D structure that best aligns with 2D projections (3D-2D pose matching). This is a challenging task especially for 3D biomolecules with many structural symmetries and repetitive features making the 2D projection highly ambiguous creating a highly multimodal distribution. Gradient-based methods such as Hamiltonian Monte Carlo often fail for these tasks, however GeoSSS manages to find the global mode with very high reliability.
+
+## Demo
 
 <p align="center">
 <img src="https://github.com/ShantanuKodgirwar/bayalign/blob/8fc3448b6f634723146101f0fc01a6e7b7921f96/assets/reg3d2d.png" width="800">
